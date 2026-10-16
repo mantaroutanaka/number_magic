@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "数の魔法 - さわって ひらめく さんすう",
+  "short_name": "数の魔法",
+  "lang": "ja",
+  "description": "小学1年生向けの、数の合成・分解を発見するパズルゲーム。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7edcf",
+  "theme_color": "#117d76",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
