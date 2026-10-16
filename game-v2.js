@@ -116,7 +116,7 @@ function gameShell(chapter,title,prompt,body){
   return wrap;
 }
 function tileRow(target,firstFill,secondFill,asCounting){
-  const row=el("div","tile-row");row.setAttribute("role","img");
+  const row=el("div","tile-row");row.style.gridTemplateColumns="repeat("+(asCounting?10:target)+",minmax(0,1fr))";row.setAttribute("role","img");
   row.setAttribute("aria-label",target+"このうち"+(firstFill+secondFill)+"こ");
   for(let i=0;i<Math.max(target,asCounting?10:target);i++){
     const filled=i<firstFill?"first":i<firstFill+secondFill?"second":"";
@@ -241,6 +241,15 @@ function currentPair(){
 function chooseNumber(n){
   if(state.win)return;
   const st=currentPair();
+  if(st.a!==null){
+    state.first=st.a;
+    state.second=n;
+    const total=st.a+n;
+    if(total===st.target){state.feedback="";finish();}
+    else if(total<st.target)state.feedback="あと "+(st.target-total)+"こ あいているよ。あいている マスを みて えらびなおそう。";
+    else state.feedback=(total-st.target)+"こ はみだすね。タイルを かえてみよう。";
+    render();return;
+  }
   if(state.first===null){
     state.first=n;state.second=null;state.feedback="つぎの タイルを ひとつ えらんでね。";
   }else{
