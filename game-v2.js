@@ -8,24 +8,32 @@ const COUNT_THINGS = [
   ["🐢","かめ"],["🐠","おさかな"],["🐚","かいがら"],["🐦","とり"],["🐬","いるか"]
 ];
 const STAGES = [];
-for (let n = 1; n <= 10; n++) STAGES.push({kind:"count",n:n,emoji:COUNT_THINGS[n-1][0],thing:COUNT_THINGS[n-1][1],chapter:0,name:n+"こ を みつけよう"});
+for (let n = 1; n <= 10; n++){
+  STAGES.push({kind:"count",n:n,emoji:COUNT_THINGS[n-1][0],thing:COUNT_THINGS[n-1][1],chapter:0,name:n+"こ を みつけよう"});
+  STAGES.push({kind:"quantity",n:n,avoidEmoji:COUNT_THINGS[n-1][0],chapter:0,name:n+"この ものは どれかな？"});
+}
 for (let a = 1; a <= 4; a++) STAGES.push({kind:"pair",target:5,a:a,chapter:1,name:a+"と いくつで 5？"});
 STAGES.push({kind:"pair",target:5,a:null,chapter:1,name:"じぶんで 5を つくろう"});
 for (let extra = 1; extra <= 5; extra++) STAGES.push({kind:"pair",target:5+extra,a:5,chapter:2,name:"5と いくつで "+(5+extra)+"？"});
 for (let a = 1; a <= 5; a++) STAGES.push({kind:"pair",target:10,a:a,chapter:3,name:a+"と いくつで 10？"});
 const CHAPTERS = [
-  {name:"① かずを かぞえよう",sub:"え → こえ → すうじ → タイル",icon:"🔎"},
+  {name:"① かずを かぞえよう",sub:"えを かぞえる → その かずを さがす",icon:"🔎"},
   {name:"② 5を つくろう",sub:"2つの タイルで 5を つくる",icon:"🌱"},
   {name:"③ 5から ふやそう",sub:"5と あといくつで 6〜10？",icon:"🌈"},
   {name:"④ 10を つくろう",sub:"2つの タイルで 10を つくる",icon:"🏰"}
 ];
 const KEY = "number-magic-learning-v2";
-let progress = {done:[],last:0};
-try {
-  const p=JSON.parse(localStorage.getItem(KEY)||"null");
-  if(p&&Array.isArray(p.done)) progress={done:p.done.filter(n=>Number.isInteger(n)&&n>=0&&n<STAGES.length),last:Number.isInteger(p.last)?p.last:0};
-} catch(e) {}
-const state={screen:"home",index:0,objects:[],found:[],first:null,second:null,feedback:"",win:false,free:false,goal:5};
+function migrateProgress(p){
+  const current=p&&p.version===3,limit=current?STAGES.length:25;
+  const mapIndex=i=>current?i:i<10?i*2:i+10;
+  const valid=i=>Number.isInteger(i)&&i>=0&&i<limit;
+  return {version:3,done:p&&Array.isArray(p.done)?[...new Set(p.done.filter(valid).map(mapIndex))]:[],last:p&&valid(p.last)?mapIndex(p.last):0};
+}
+let progress=migrateProgress(null);
+try {progress=migrateProgress(JSON.parse(localStorage.getItem(KEY)||"null"));}catch(e){}
+const state={screen:"home",index:0,objects:[],groups:[],selected:null,quantityShown:0,quantityChecked:false,quantityCounting:false,found:[],first:null,second:null,feedback:"",win:false,free:false,goal:5};
+let quantityTimer=null;
+function stopQuantityCount(){clearTimeout(quantityTimer);quantityTimer=null;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(progress))}catch(e){}}
 function el(tag,cls,text){
   const node=document.createElement(tag);
@@ -49,13 +57,17 @@ function speak(s){
     speechSynthesis.speak(u);
   }catch(e){}
 }
-function goHome(){state.screen="home";render();window.scrollTo(0,0)}
+function goHome(){stopQuantityCount();state.screen="home";render();window.scrollTo(0,0)}
 function enter(i){
   if(i<0||i>=STAGES.length)return;
+  stopQuantityCount();
+  state.groups=STAGES[i].kind==="quantity"?quantityGroups(STAGES[i]):[];
+  state.selected=null;state.quantityShown=0;state.quantityChecked=false;state.quantityCounting=false;
   state.screen="stage";state.index=i;state.objects=STAGES[i].kind==="count"?shuffledObjects(STAGES[i]):[];state.found=[];state.first=null;state.second=null;state.feedback="";state.win=false;state.free=false;
   progress.last=i;save();render();window.scrollTo(0,0);
 }
 function enterFree(){
+  stopQuantityCount();
   state.screen="free";state.free=true;state.first=null;state.second=null;state.goal=5;state.feedback="";state.win=false;
   render();window.scrollTo(0,0);
 }
@@ -174,6 +186,12 @@ function shuffledObjects(stage){
   });
   return shuffle(arr);
 }
+function quantityGroups(stage){
+  const choices=shuffle(COUNT_THINGS.filter(([emoji])=>emoji!==stage.avoidEmoji&&emoji!=="🐠"&&!(stage.avoidEmoji==="🐠"&&emoji==="🐟"))).slice(0,3);
+  const nearby=shuffle(Array.from({length:10},(_,i)=>i+1).filter(n=>n!==stage.n&&Math.abs(n-stage.n)<=2)).slice(0,2);
+  const counts=[stage.n,...nearby];
+  return shuffle(counts.map((count,i)=>({id:"q"+i,emoji:choices[i][0],thing:choices[i][1],count})));
+}
 function resetCounting(){
   state.objects=shuffledObjects(STAGES[state.index]);
   state.found=[];state.win=false;state.feedback="";
@@ -252,6 +270,69 @@ function counting(){
   add(tools,button("⟳ もういちど かぞえる",resetCounting,"tool"));
   body.append(tools);if(feedback())body.append(feedback());
   return gameShell(CHAPTERS[0].name,st.name,st.thing+" を みつけて、1こずつ かぞえよう。",body);
+}
+function resetQuantity(newScene){
+  stopQuantityCount();
+  if(newScene)state.groups=quantityGroups(STAGES[state.index]);
+  state.selected=null;state.quantityShown=0;state.quantityChecked=false;state.quantityCounting=false;
+  state.win=false;state.feedback="";render();
+}
+function selectQuantity(id){
+  if(state.quantityChecked||state.win)return;
+  state.selected=id;state.feedback="";render();
+}
+function checkQuantity(){
+  if(state.quantityChecked||state.win)return;
+  const group=state.groups.find(g=>g.id===state.selected),st=STAGES[state.index];
+  if(!group)return;
+  state.quantityChecked=true;state.quantityCounting=true;state.quantityShown=0;state.feedback="";render();
+  function tick(){
+    if(state.quantityShown<group.count){
+      const picture=document.querySelector(".quantity-option.selected .quantity-picture:nth-child("+(state.quantityShown+1)+")");
+      const rect=picture?picture.getBoundingClientRect():null,index=state.quantityShown;
+      state.quantityShown++;speak(READ[state.quantityShown]);render();
+      if(rect)flyEmoji(group.emoji,rect,index);
+      quantityTimer=setTimeout(tick,360);
+    }else{
+      quantityTimer=null;state.quantityCounting=false;
+      if(group.count===st.n){finish();}
+      else state.feedback=group.thing+" は "+group.count+"こ だったね。"+st.n+"この ものを もういちど さがそう。";
+      render();
+    }
+  }
+  tick();
+}
+function quantityGame(){
+  const st=STAGES[state.index],body=el("div","");
+  const task=el("div","count-task");
+  task.append(el("strong","",st.n+"この ものは どれかな？"));body.append(task);
+  body.append(el("p","quantity-instruction","それぞれの えを かぞえて、なかまを ひとつ えらぼう。"));
+  const options=el("div","quantity-options");
+  state.groups.forEach(group=>{
+    const selected=state.selected===group.id;
+    const b=button("",()=>selectQuantity(group.id),"quantity-option"+(selected?" selected":""),state.quantityChecked||state.win);
+    b.setAttribute("aria-label",group.thing+"を えらぶ");b.setAttribute("aria-pressed",String(selected));
+    const pictures=el("span","quantity-pictures");pictures.setAttribute("aria-hidden","true");
+    for(let i=0;i<group.count;i++)pictures.append(el("span","quantity-picture",group.emoji));
+    add(b,pictures,el("span","quantity-name",group.thing),el("span","quantity-pick",selected?"✓ これに する":"えらぶ"));
+    options.append(b);
+  });
+  body.append(options);
+  if(!state.quantityChecked){
+    body.append(button("これで たしかめる",checkQuantity,"btn btn-primary quantity-check",state.selected===null));
+  }else{
+    const group=state.groups.find(g=>g.id===state.selected);
+    const meter=el("section","number-meter quantity-meter"),top=el("div","meter-head");
+    add(top,el("strong","",group.thing+" を かぞえよう"),el("span","meter-value",state.quantityShown+"こ"));
+    add(meter,top,tileRow(10,state.quantityShown,0,true));
+    if(state.quantityShown){const reading=el("div","reading-line");add(reading,numberRead(state.quantityShown,true),voiceButton(state.quantityShown));meter.append(reading);}
+    body.append(meter);
+    if(state.quantityCounting)body.append(el("p","quantity-instruction","1こずつ タイルと くらべて みよう。"));
+    else if(state.win)body.append(success(st.n+"この ものは "+group.emoji+" "+group.thing+"！",st.n+"この タイルと おなじ かずだね。"));
+    else{body.append(feedback());body.append(button("もういちど えらぶ",()=>resetQuantity(false),"btn btn-primary quantity-check"));}
+  }
+  const tools=el("div","game-tools");tools.append(button("⟳ ちがう えで ためす",()=>resetQuantity(true),"tool"));body.append(tools);
+  return gameShell(CHAPTERS[0].name,st.name,st.n+"こ あるのは、どの なかまかな？",body);
 }
 function currentPair(){
   if(state.free)return{target:state.goal,a:null,chapter:3,name:state.goal+"を つくろう"};
@@ -347,7 +428,8 @@ function pairGame(){
   return gameShell(chapter,state.free?"2つの タイルで つくろう":st.name,prompt,body);
 }
 function render(){
-  ROOT.replaceChildren(state.screen==="home"?home():state.screen==="stage"&&STAGES[state.index].kind==="count"?counting():pairGame());
+  const kind=state.screen==="stage"?STAGES[state.index].kind:null;
+  ROOT.replaceChildren(state.screen==="home"?home():kind==="count"?counting():kind==="quantity"?quantityGame():pairGame());
 }
 render();
 if("serviceWorker" in navigator && location.protocol==="https:"){
