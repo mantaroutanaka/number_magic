@@ -8,26 +8,39 @@ const COUNT_THINGS = [
   ["🐢","かめ"],["🐠","おさかな"],["🐚","かいがら"],["🐦","とり"],["🐬","いるか"]
 ];
 const STAGES = [];
-for (let n = 1; n <= 10; n++){
-  STAGES.push({kind:"count",n:n,emoji:COUNT_THINGS[n-1][0],thing:COUNT_THINGS[n-1][1],chapter:0,name:n+"こ を みつけよう"});
-  STAGES.push({kind:"quantity",n:n,avoidEmoji:COUNT_THINGS[n-1][0],chapter:0,name:n+"この ものは どれかな？"});
+function addCountingStages(n,chapter){
+  STAGES.push({id:"count-"+n,kind:"count",n:n,emoji:COUNT_THINGS[n-1][0],thing:COUNT_THINGS[n-1][1],chapter:chapter,name:n+"こ を みつけよう"});
+  STAGES.push({id:"quantity-"+n,kind:"quantity",n:n,avoidEmoji:COUNT_THINGS[n-1][0],chapter:chapter,name:n+"この ものは どれかな？"});
 }
-for (let a = 1; a <= 4; a++) STAGES.push({kind:"pair",target:5,a:a,chapter:1,name:a+"と いくつで 5？"});
-STAGES.push({kind:"pair",target:5,a:null,chapter:1,name:"じぶんで 5を つくろう"});
-for (let extra = 1; extra <= 5; extra++) STAGES.push({kind:"pair",target:5+extra,a:5,chapter:2,name:"5と いくつで "+(5+extra)+"？"});
-for (let a = 1; a <= 5; a++) STAGES.push({kind:"pair",target:10,a:a,chapter:3,name:a+"と いくつで 10？"});
+for(let n=1;n<=5;n++)addCountingStages(n,0);
+for(let a=1;a<=4;a++)STAGES.push({id:"make5-"+a,kind:"pair",target:5,a:a,chapter:1,name:a+"と いくつで 5？"});
+STAGES.push({id:"make5-free",kind:"pair",target:5,a:null,chapter:1,name:"じぶんで 5を つくろう"});
+for(let n=6;n<=10;n++){
+  addCountingStages(n,2);
+  STAGES.push({id:"fiveplus-"+n,kind:"pair",target:n,a:5,chapter:2,name:"5と いくつで "+n+"？"});
+}
+for(let a=1;a<=5;a++)STAGES.push({id:"make10-"+a,kind:"pair",target:10,a:a,chapter:3,name:a+"と いくつで 10？"});
 const CHAPTERS = [
-  {name:"① かずを かぞえよう",sub:"えを かぞえる → その かずを さがす",icon:"🔎"},
+  {name:"① 1〜5を かぞえよう",sub:"えを かぞえる → その かずを さがす",icon:"🔎"},
   {name:"② 5を つくろう",sub:"2つの タイルで 5を つくる",icon:"🌱"},
-  {name:"③ 5から ふやそう",sub:"5と あといくつで 6〜10？",icon:"🌈"},
+  {name:"③ 6〜10を かぞえて つくろう",sub:"かぞえる → えらぶ → 5と あといくつ？",icon:"🌈"},
   {name:"④ 10を つくろう",sub:"2つの タイルで 10を つくる",icon:"🏰"}
 ];
 const KEY = "number-magic-learning-v2";
 function migrateProgress(p){
-  const current=p&&p.version===3,limit=current?STAGES.length:25;
-  const mapIndex=i=>current?i:i<10?i*2:i+10;
-  const valid=i=>Number.isInteger(i)&&i>=0&&i<limit;
-  return {version:3,done:p&&Array.isArray(p.done)?[...new Set(p.done.filter(valid).map(mapIndex))]:[],last:p&&valid(p.last)?mapIndex(p.last):0};
+  const ids=STAGES.map(st=>st.id),current=p&&p.version===4;
+  function oldId(i){
+    const previous=p&&p.version===3,limit=previous?35:25;
+    if(!Number.isInteger(i)||i<0||i>=limit)return null;
+    const oldIndex=previous?i:i<10?i*2:i+10;
+    if(oldIndex<20)return (oldIndex%2?"quantity-":"count-")+(Math.floor(oldIndex/2)+1);
+    if(oldIndex<24)return "make5-"+(oldIndex-19);
+    if(oldIndex===24)return "make5-free";
+    if(oldIndex<30)return "fiveplus-"+(oldIndex-19);
+    return "make10-"+(oldIndex-29);
+  }
+  const toId=value=>current?(ids.includes(value)?value:null):oldId(value);
+  return {version:4,done:p&&Array.isArray(p.done)?[...new Set(p.done.map(toId).filter(id=>ids.includes(id)))]:[],last:p&&toId(p.last)||ids[0]};
 }
 let progress=migrateProgress(null);
 try {progress=migrateProgress(JSON.parse(localStorage.getItem(KEY)||"null"));}catch(e){}
@@ -64,7 +77,7 @@ function enter(i){
   state.groups=STAGES[i].kind==="quantity"?quantityGroups(STAGES[i]):[];
   state.selected=null;state.quantityShown=0;state.quantityChecked=false;state.quantityCounting=false;
   state.screen="stage";state.index=i;state.objects=STAGES[i].kind==="count"?shuffledObjects(STAGES[i]):[];state.found=[];state.first=null;state.second=null;state.feedback="";state.win=false;state.free=false;
-  progress.last=i;save();render();window.scrollTo(0,0);
+  progress.last=STAGES[i].id;save();render();window.scrollTo(0,0);
 }
 function enterFree(){
   stopQuantityCount();
@@ -73,9 +86,9 @@ function enterFree(){
 }
 function finish(){
   state.win=true;
-  if(!state.free&&!progress.done.includes(state.index)){progress.done.push(state.index);save()}
+  if(!state.free&&!progress.done.includes(STAGES[state.index].id)){progress.done.push(STAGES[state.index].id);save()}
 }
-function unlocked(){for(let i=0;i<STAGES.length;i++)if(!progress.done.includes(i))return i;return STAGES.length-1}
+function unlocked(){for(let i=0;i<STAGES.length;i++)if(!progress.done.includes(STAGES[i].id))return i;return STAGES.length-1}
 function header(){
   const h=el("header","head");
   const brand=el("div","brand");add(brand,el("span","brand-bubble","🦕"),el("span","", "数の魔法"));
@@ -91,7 +104,7 @@ function home(){
   add(acts,button(progress.done.length?"つづきから あそぶ":"はじめから あそぶ",()=>enter(unlocked()),"btn btn-primary"),button("じゆうに ためす",enterFree,"btn btn-secondary"));
   hero.append(acts);wrap.append(hero);
   const road=el("div","learning-road");
-  add(road,el("strong","","この じゅんばんで あそぶよ"),el("p","","① えを かぞえる → ② 5を つくる → ③ 5から ふやす → ④ 10を つくる"));
+  add(road,el("strong","","この じゅんばんで あそぶよ"),el("p","","① 1〜5を かぞえる → ② 5を つくる → ③ 6〜10を かぞえて 5から ふやす → ④ 10を つくる"));
   wrap.append(road);
   CHAPTERS.forEach((ch,k)=>{
     const group=el("section","chapter");
@@ -100,10 +113,10 @@ function home(){
     const grid=el("div","stage-grid");
     STAGES.forEach((st,i)=>{
       if(st.chapter!==k)return;
-      const locked=i>unlocked()&&!progress.done.includes(i);
+      const locked=i>unlocked()&&!progress.done.includes(STAGES[i].id);
       const b=button(" ",()=>enter(i),"stage-card"+(locked?" locked":""),locked);
       b.textContent="";
-      add(b,el("span","num",progress.done.includes(i)?"⭐ "+(i+1):"♧ "+(i+1)),el("span","title",st.name),el("span","mini",locked?"🔒 じゅんばんに あそぼう":progress.done.includes(i)?"もういちど あそべる":"タップして あそぶ"));
+      add(b,el("span","num",progress.done.includes(STAGES[i].id)?"⭐ "+(i+1):"♧ "+(i+1)),el("span","title",st.name),el("span","mini",locked?"🔒 じゅんばんに あそぼう":progress.done.includes(STAGES[i].id)?"もういちど あそべる":"タップして あそぶ"));
       grid.append(b);
     });
     group.append(grid);wrap.append(group);
@@ -269,7 +282,7 @@ function counting(){
   const tools=el("div","game-tools");
   add(tools,button("⟳ もういちど かぞえる",resetCounting,"tool"));
   body.append(tools);if(feedback())body.append(feedback());
-  return gameShell(CHAPTERS[0].name,st.name,st.thing+" を みつけて、1こずつ かぞえよう。",body);
+  return gameShell(CHAPTERS[st.chapter].name,st.name,st.thing+" を みつけて、1こずつ かぞえよう。",body);
 }
 function resetQuantity(newScene){
   stopQuantityCount();
@@ -332,7 +345,7 @@ function quantityGame(){
     else{body.append(feedback());body.append(button("もういちど えらぶ",()=>resetQuantity(false),"btn btn-primary quantity-check"));}
   }
   const tools=el("div","game-tools");tools.append(button("⟳ ちがう えで ためす",()=>resetQuantity(true),"tool"));body.append(tools);
-  return gameShell(CHAPTERS[0].name,st.name,st.n+"こ あるのは、どの なかまかな？",body);
+  return gameShell(CHAPTERS[st.chapter].name,st.name,st.n+"こ あるのは、どの なかまかな？",body);
 }
 function currentPair(){
   if(state.free)return{target:state.goal,a:null,chapter:3,name:state.goal+"を つくろう"};

@@ -56,32 +56,56 @@ for(let n=1;n<=10;n++)test(n+" quantity choice: one answer and varied pictures",
   assert.ok(answers.size>3,"answer picture varies");
 });
 const stages=vm.runInNewContext(source.slice(source.indexOf("const COUNT_THINGS"),source.indexOf("const CHAPTERS"))+";STAGES");
-test("each count from 1 to 10 is followed by its quantity choice",()=>{
-  assert.equal(stages.length,35);
+const expectedIds=[];
+for(let n=1;n<=5;n++)expectedIds.push("count-"+n,"quantity-"+n);
+for(let a=1;a<=4;a++)expectedIds.push("make5-"+a);
+expectedIds.push("make5-free");
+for(let n=6;n<=10;n++)expectedIds.push("count-"+n,"quantity-"+n,"fiveplus-"+n);
+for(let a=1;a<=5;a++)expectedIds.push("make10-"+a);
+const plain=value=>JSON.parse(JSON.stringify(value));
+test("5 composition follows quantity 5; each 6–10 is counted, chosen, then built from 5",()=>{
+  assert.deepEqual(plain(stages.map(st=>st.id)),expectedIds);
+  assert.equal(new Set(stages.map(st=>st.id)).size,35);
   for(let n=1;n<=10;n++){
-    assert.equal(stages[(n-1)*2].kind,"count");
-    assert.equal(stages[(n-1)*2].n,n);
-    assert.equal(stages[(n-1)*2+1].kind,"quantity");
-    assert.equal(stages[(n-1)*2+1].n,n);
-    assert.equal(stages[(n-1)*2+1].avoidEmoji,stages[(n-1)*2].emoji);
+    const i=stages.findIndex(st=>st.id==="count-"+n);
+    assert.equal(stages[i].kind,"count");
+    assert.equal(stages[i+1].id,"quantity-"+n);
+    assert.equal(stages[i+1].avoidEmoji,stages[i].emoji);
+    if(n>=6){assert.equal(stages[i+2].id,"fiveplus-"+n);assert.equal(stages[i+2].a,5);assert.equal(stages[i+2].target,n);}
   }
-  assert.ok(stages.slice(20).every(st=>st.kind==="pair"));
+  assert.ok(stages.every((st,i)=>i===0||st.chapter>=stages[i-1].chapter),"map chapter order matches play order");
 });
 const migrate=vm.runInNewContext(source.slice(source.indexOf("function migrateProgress"),source.indexOf("let progress="))+";migrateProgress",{STAGES:stages});
-const plain=value=>JSON.parse(JSON.stringify(value));
-test("legacy progress retains all 25 completions and opens new exercises",()=>{
+const oldIds=[];
+for(let n=1;n<=10;n++)oldIds.push("count-"+n,"quantity-"+n);
+for(let a=1;a<=4;a++)oldIds.push("make5-"+a);
+oldIds.push("make5-free");
+for(let n=6;n<=10;n++)oldIds.push("fiveplus-"+n);
+for(let a=1;a<=5;a++)oldIds.push("make10-"+a);
+test("all previous 35-stage positions migrate by problem identity",()=>{
+  for(let i=0;i<35;i++){
+    const next=plain(migrate({version:3,done:[i],last:i}));
+    assert.deepEqual(next,{version:4,done:[oldIds[i]],last:oldIds[i]});
+    assert.deepEqual(plain(migrate(next)),next,"ID-based progress is stable");
+  }
+  const all=plain(migrate({version:3,done:Array.from({length:35},(_,i)=>i),last:34}));
+  assert.deepEqual(all.done,oldIds);
+  assert.equal(all.done.length,35);
+});
+test("older 25-stage completions retain identity without completing new choices",()=>{
   const old={done:Array.from({length:25},(_,i)=>i),last:5};
   const next=plain(migrate(old));
-  assert.equal(next.version,3);
+  assert.equal(next.version,4);
   assert.equal(next.done.length,25);
-  assert.deepEqual(next.done.slice(0,10),[0,2,4,6,8,10,12,14,16,18]);
-  assert.deepEqual(next.done.slice(10),Array.from({length:15},(_,i)=>i+20));
-  assert.equal(next.last,10);
-  assert.deepEqual(plain(migrate(next)),next,"migration is idempotent");
+  assert.deepEqual(next.done.slice(0,10),Array.from({length:10},(_,i)=>"count-"+(i+1)));
+  assert.deepEqual(next.done.slice(10),oldIds.slice(20));
+  assert.equal(next.last,"count-6");
+  assert.deepEqual(plain(migrate(next)),next);
 });
 test("invalid saved progress is discarded without creating completions",()=>{
-  assert.deepEqual(plain(migrate(null)),{version:3,done:[],last:0});
-  assert.deepEqual(plain(migrate({done:[-1,25,"1",1,1],last:99})),{version:3,done:[2],last:0});
+  assert.deepEqual(plain(migrate(null)),{version:4,done:[],last:"count-1"});
+  assert.deepEqual(plain(migrate({done:[-1,25,"1",1,1],last:99})),{version:4,done:["count-2"],last:"count-1"});
+  assert.deepEqual(plain(migrate({version:4,done:[0,"count-1","missing","count-1"],last:"missing"})),{version:4,done:["count-1"],last:"count-1"});
 });
 
 test("quantity choices do not repeat the previous animal or mix two fish types",()=>{
