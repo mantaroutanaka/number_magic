@@ -52,6 +52,8 @@ button:focus-visible{outline:4px solid #e6a629;outline-offset:3px}
 .picture-scene:after{content:"〰   🌱   〰   🌿   〰";position:absolute;bottom:2px;left:8px;opacity:.25;font-size:18px;pointer-events:none}
 .scene-hint{font-size:13px;text-align:center;color:#3c6770;font-weight:950;margin-bottom:10px}
 .scene-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;max-width:720px;margin:auto}
+.scene-grid.dense{grid-template-columns:repeat(6,minmax(0,1fr))}
+.scene-grid.dense .scene-object{min-height:58px;font-size:34px}
 .scene-object{border:2px solid #ffffffbb;min-height:78px;max-height:96px;border-radius:18px;background:#ffffff8c;font-size:clamp(29px,5.6vw,45px);box-shadow:0 4px 0 #8cc6bc75;display:grid;place-items:center;touch-action:manipulation;transition:background .2s,transform .15s,opacity .2s;white-space:nowrap;position:relative;z-index:1}
 .scene-object:nth-child(3n){transform:rotate(-4deg)}
 .scene-object:nth-child(5n){transform:rotate(5deg)}
@@ -115,6 +117,9 @@ button:focus-visible{outline:4px solid #e6a629;outline-offset:3px}
   .hero p{position:relative;z-index:1}
   .scene-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
   .scene-object{min-height:69px;border-radius:15px}
+  .scene-grid.dense{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+  .scene-grid.dense .scene-object{min-height:48px;font-size:28px;border-radius:12px}
+  .scene-grid.dense .scene-object.found{font-size:21px}
   .chapter{margin-bottom:23px}
 }
 @media(max-width:380px){

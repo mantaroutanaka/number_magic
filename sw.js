@@ -1,4 +1,4 @@
-const CACHE = "number-magic-v2-counting";
+const CACHE = "number-magic-v3-mixed-counting";
 const OFFLINE = ["./","./index.html","./game-v2.css","./game-v2.js","./manifest.webmanifest","./icons/icon.svg"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(OFFLINE)).then(() => self.skipWaiting()));

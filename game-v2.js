@@ -25,7 +25,7 @@ try {
   const p=JSON.parse(localStorage.getItem(KEY)||"null");
   if(p&&Array.isArray(p.done)) progress={done:p.done.filter(n=>Number.isInteger(n)&&n>=0&&n<STAGES.length),last:Number.isInteger(p.last)?p.last:0};
 } catch(e) {}
-const state={screen:"home",index:0,found:[],first:null,second:null,feedback:"",win:false,free:false,goal:5};
+const state={screen:"home",index:0,objects:[],found:[],first:null,second:null,feedback:"",win:false,free:false,goal:5};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(progress))}catch(e){}}
 function el(tag,cls,text){
   const node=document.createElement(tag);
@@ -52,7 +52,7 @@ function speak(s){
 function goHome(){state.screen="home";render();window.scrollTo(0,0)}
 function enter(i){
   if(i<0||i>=STAGES.length)return;
-  state.screen="stage";state.index=i;state.found=[];state.first=null;state.second=null;state.feedback="";state.win=false;state.free=false;
+  state.screen="stage";state.index=i;state.objects=STAGES[i].kind==="count"?shuffledObjects(STAGES[i]):[];state.found=[];state.first=null;state.second=null;state.feedback="";state.win=false;state.free=false;
   progress.last=i;save();render();window.scrollTo(0,0);
 }
 function enterFree(){
@@ -153,12 +153,31 @@ function success(summary,extra){
   add(actions,button("しまの ちず",goHome,"btn btn-secondary"));
   box.append(actions);return box;
 }
+function shuffle(items){
+  const arr=items.slice();
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
 function shuffledObjects(stage){
   const arr=[];
   for(let i=0;i<stage.n;i++)arr.push({id:"t"+i,emoji:stage.emoji,target:true});
-  const others=["🌼","🪨","🌲","⭐","🍄","🌷","🦀","🐌"];
-  for(let i=0;i<(stage.n<=3?4:5);i++)arr.push({id:"d"+i,emoji:others[(i+stage.n)%others.length],target:false});
-  return arr.map((v,i)=>({v:v,sort:Math.sin((i+1)*91.37+stage.n*13.3)})).sort((a,b)=>a.sort-b.sort).map(x=>x.v);
+  const others=shuffle(["🌼","🪨","🌲","⭐","🍄","🌷","🦀","🐌"].filter(emoji=>emoji!==stage.emoji));
+  // A same-count category prevents frequency alone from identifying the target.
+  // For 1, also include two repeated categories so the scene is not all singletons.
+  const nearby=stage.n===2?3:stage.n===10?9:stage.n+(Math.random()<.5?-1:1);
+  const counts=stage.n===1?[1,2,2]:[stage.n,nearby];
+  counts.forEach((count,category)=>{
+    for(let i=0;i<count;i++)arr.push({id:"d"+category+"-"+i,emoji:others[category],target:false});
+  });
+  return shuffle(arr);
+}
+function resetCounting(){
+  state.objects=shuffledObjects(STAGES[state.index]);
+  state.found=[];state.win=false;state.feedback="";
+  render();
 }
 function flyEmoji(emoji,from,index){
   if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
@@ -196,8 +215,8 @@ function counting(){
   body.append(task);
   const scene=el("section","picture-scene");
   scene.append(el("div","scene-hint","えの なかから さがして タップ！"));
-  const items=el("div","scene-grid");
-  shuffledObjects(st).forEach(obj=>{
+  const items=el("div","scene-grid"+(state.objects.length>20?" dense":""));
+  state.objects.forEach(obj=>{
     const done=state.found.includes(obj.id);
     const b=button(obj.emoji+(done?" ✓":""),()=>tapObject(obj,b,st),"scene-object"+(done?" found":""));
     b.setAttribute("aria-label",obj.emoji+(done?" かぞえた":" を タップ"));
@@ -230,7 +249,7 @@ function counting(){
     body.append(confirm);
   }
   const tools=el("div","game-tools");
-  add(tools,button("⟳ もういちど かぞえる",()=>{state.found=[];state.win=false;state.feedback="";render()},"tool"));
+  add(tools,button("⟳ もういちど かぞえる",resetCounting,"tool"));
   body.append(tools);if(feedback())body.append(feedback());
   return gameShell(CHAPTERS[0].name,st.name,st.thing+" を みつけて、1こずつ かぞえよう。",body);
 }
