@@ -48,7 +48,7 @@ test("intro games allow retries, save completion, and lead into original stages"
   const root=new Node();
   const context={document:{getElementById:()=>root,createElement:()=>new Node()},window:{scrollTo(){}},localStorage:{getItem:()=>null,setItem(){}},navigator:{},location:{protocol:"http:"},clearTimeout,setTimeout};
   vm.createContext(context);
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,chooseMeasurement,nextMeasurement,measurementResult,chooseOrdinal,nextOrdinal,state,progress,STAGES,unlocked};})();"),context);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,chooseMeasurement,nextMeasurement,measurementResult,chooseOrdinal,nextOrdinal,tapTwenty,setTwentyDigit,chooseTwenty,nextTwenty,state,progress,STAGES,unlocked};})();"),context);
   const game=context.game;
   game.enter(0);
   const intro=game.state.intro;
@@ -110,6 +110,46 @@ test("intro games allow retries, save completion, and lead into original stages"
   assert.equal(game.unlocked(),5);
   game.enter(5);
   assert.equal(game.STAGES[game.state.index].id,"count-1");
+  for(const mode of ["count","read","place","compare","sequence","parts","calculate"]){
+    const id="twenty-"+mode,index=game.STAGES.findIndex(stage=>stage.id===id);
+    assert.ok(index>game.STAGES.findIndex(stage=>stage.id==="ordinal-grid"));
+    game.enter(index);
+    const task=game.state.twenty;
+    for(let i=0;i<task.rounds.length;i++){
+      const problem=task.rounds[i];
+      game.nextTwenty();
+      assert.equal(task.round,i,"unsolved 20-number tasks cannot be skipped");
+      if(mode==="count"){
+        game.chooseTwenty(problem.answer);
+        assert.equal(task.solved,false,"must count every object first");
+        for(let j=0;j<problem.n;j++)game.tapTwenty(j);
+        game.tapTwenty(0);
+        assert.equal(task.tapped.length,problem.n,"double taps do not count twice");
+      }
+      if(mode==="place"){
+        game.chooseTwenty(problem.answer);
+        assert.equal(task.solved,false,"must construct both digits");
+        game.setTwentyDigit(0,1);game.setTwentyDigit(1,0);
+        game.chooseTwenty(10);
+        assert.equal(task.solved,false);
+        game.setTwentyDigit(0,Math.floor(problem.n/10));game.setTwentyDigit(1,problem.n%10);
+      }else{
+        game.chooseTwenty(problem.answer===20?19:problem.answer+1);
+        assert.equal(task.solved,false);
+      }
+      game.chooseTwenty(problem.answer);
+      assert.equal(task.solved,true);
+      assert.equal(game.state.win,i===task.rounds.length-1);
+      if(i<task.rounds.length-1){
+        assert.ok(!game.progress.done.includes(id));
+        game.nextTwenty();
+        assert.equal(task.round,i+1);
+        assert.equal(task.tapped.length,0);
+        assert.deepEqual(Array.from(task.digits),[null,null]);
+      }
+    }
+    assert.ok(game.progress.done.includes(id));
+  }
   for(const id of ["ordinal-directions","ordinal-cardinality","ordinal-grid"]){
     const index=game.STAGES.findIndex(stage=>stage.id===id);
     assert.ok(index>game.STAGES.findIndex(stage=>stage.id==="quantity-10"));
@@ -190,10 +230,11 @@ expectedIds.push("make5-free");
 for(let n=6;n<=10;n++)expectedIds.push("count-"+n,"quantity-"+n,"fiveplus-"+n);
 for(let a=1;a<=5;a++)expectedIds.push("make10-"+a);
 expectedIds.push("ordinal-directions","ordinal-cardinality","ordinal-grid");
+expectedIds.push(...["count","read","place","compare","sequence","parts","calculate"].map(mode=>"twenty-"+mode));
 const plain=value=>JSON.parse(JSON.stringify(value));
 test("5 composition follows quantity 5; each 6–10 is counted, chosen, then built from 5",()=>{
   assert.deepEqual(plain(stages.map(st=>st.id)),expectedIds);
-  assert.equal(new Set(stages.map(st=>st.id)).size,43);
+  assert.equal(new Set(stages.map(st=>st.id)).size,50);
   for(let n=1;n<=10;n++){
     const i=stages.findIndex(st=>st.id==="count-"+n);
     assert.equal(stages[i].kind,"count");
@@ -254,4 +295,29 @@ test("ordinal lesson answers distinguish direction, quantity, and two-axis posit
   assert.deepEqual(cardinality[3].marked,cardinality[4].marked,"same marked object, different questions");
   assert.deepEqual(cardinality[3].pictures,cardinality[4].pictures);
   assert.deepEqual(plain(make("grid").rounds.map(problem=>problem.answer)),[5,7,7,10]);
+});
+test("20-number lessons cover every numeral, zero ones at 20, series and valid arithmetic",()=>{
+  const read=vm.runInNewContext(source.slice(source.indexOf("const READ"),source.indexOf("const COUNT_THINGS"))+";READ");
+  const start=source.indexOf("function makeTwenty("),end=source.indexOf("function tapTwenty(",start);
+  const make=vm.runInNewContext(source.slice(start,end)+";makeTwenty",{READ:read,shuffle:items=>items.slice().reverse()});
+  for(const mode of ["count","read","place"]){
+    assert.deepEqual(plain(make(mode).rounds.map(problem=>problem.answer)),[11,12,13,14,15,16,17,18,19,20]);
+  }
+  assert.equal(read[20],"にじゅう");
+  const twenty=make("place").rounds.at(-1);
+  assert.equal(Math.floor(twenty.n/10),2);
+  assert.equal(twenty.n%10,0);
+  for(const problem of make("compare").rounds){
+    assert.equal(problem.answer,problem.greater?Math.max(problem.a,problem.b):Math.min(problem.a,problem.b));
+  }
+  assert.deepEqual(plain(make("sequence").rounds.map(problem=>problem.answer)),[12,17,20,18,12]);
+  assert.deepEqual(plain(make("parts").rounds.map(problem=>problem.answer)),[7,12,3,14,10,6]);
+  assert.deepEqual(plain(make("calculate").rounds.map(problem=>problem.answer)),[15,18,20,12,15,14,20,8]);
+  for(const mode of ["parts","calculate"])for(const problem of make(mode).rounds){
+    assert.equal(problem.choices.filter(choice=>choice===problem.answer).length,1);
+    assert.equal(new Set(problem.choices).size,4);
+    assert.ok(problem.choices.every(choice=>choice>=0&&choice<=20));
+    assert.ok(problem.result>=0&&problem.result<=20);
+    assert.equal(problem.op==="+"?problem.a+problem.b:problem.a-problem.b,problem.result);
+  }
 });
