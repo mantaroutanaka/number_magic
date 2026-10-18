@@ -1,4 +1,4 @@
-const CACHE = "number-magic-v9-unique-category-pictures";
+const CACHE = "number-magic-v10-ordinal-positions";
 const OFFLINE = ["./","./index.html","./game-v2.css","./game-v2.js","./manifest.webmanifest","./icons/icon.svg"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(OFFLINE)).then(() => self.skipWaiting()));

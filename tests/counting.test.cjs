@@ -48,7 +48,7 @@ test("intro games allow retries, save completion, and lead into original stages"
   const root=new Node();
   const context={document:{getElementById:()=>root,createElement:()=>new Node()},window:{scrollTo(){}},localStorage:{getItem:()=>null,setItem(){}},navigator:{},location:{protocol:"http:"},clearTimeout,setTimeout};
   vm.createContext(context);
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,chooseMeasurement,nextMeasurement,measurementResult,state,progress,STAGES,unlocked};})();"),context);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,chooseMeasurement,nextMeasurement,measurementResult,chooseOrdinal,nextOrdinal,state,progress,STAGES,unlocked};})();"),context);
   const game=context.game;
   game.enter(0);
   const intro=game.state.intro;
@@ -110,6 +110,32 @@ test("intro games allow retries, save completion, and lead into original stages"
   assert.equal(game.unlocked(),5);
   game.enter(5);
   assert.equal(game.STAGES[game.state.index].id,"count-1");
+  for(const id of ["ordinal-directions","ordinal-cardinality","ordinal-grid"]){
+    const index=game.STAGES.findIndex(stage=>stage.id===id);
+    assert.ok(index>game.STAGES.findIndex(stage=>stage.id==="quantity-10"));
+    assert.ok(index<game.STAGES.findIndex(stage=>stage.id==="make10-1"));
+    game.enter(index);
+    const task=game.state.ordinal;
+    for(let i=0;i<task.rounds.length;i++){
+      const problem=task.rounds[i];
+      game.nextOrdinal();
+      assert.equal(task.round,i,"unsolved ordinal problems cannot be skipped");
+      const wrong=problem.type==="number"?(problem.answer===1?2:1):(problem.answer+1)%problem.n;
+      game.chooseOrdinal(wrong);
+      assert.equal(task.solved,false);
+      assert.equal(game.state.ordinal,task,"retry preserves arrangement");
+      game.chooseOrdinal(problem.answer);
+      assert.equal(task.solved,true);
+      assert.equal(game.state.win,i===task.rounds.length-1);
+      if(i<task.rounds.length-1){
+        assert.ok(!game.progress.done.includes(id));
+        game.nextOrdinal();
+        assert.equal(task.round,i+1);
+        assert.equal(game.state.selected,null);
+      }
+    }
+    assert.ok(game.progress.done.includes(id));
+  }
 });
 test("intro generators vary answer positions and keep one clear answer",()=>{
   const make=vm.runInNewContext(source.slice(source.indexOf("function makeIntro("),source.indexOf("function chooseIntro("))+";makeIntro",{shuffle:items=>items.slice().sort(()=>Math.random()-.5),COUNT_THINGS:things});
@@ -162,11 +188,12 @@ for(let n=1;n<=5;n++)expectedIds.push("count-"+n,"quantity-"+n);
 for(let a=1;a<=4;a++)expectedIds.push("make5-"+a);
 expectedIds.push("make5-free");
 for(let n=6;n<=10;n++)expectedIds.push("count-"+n,"quantity-"+n,"fiveplus-"+n);
+expectedIds.push("ordinal-directions","ordinal-cardinality","ordinal-grid");
 for(let a=1;a<=5;a++)expectedIds.push("make10-"+a);
 const plain=value=>JSON.parse(JSON.stringify(value));
 test("5 composition follows quantity 5; each 6–10 is counted, chosen, then built from 5",()=>{
   assert.deepEqual(plain(stages.map(st=>st.id)),expectedIds);
-  assert.equal(new Set(stages.map(st=>st.id)).size,40);
+  assert.equal(new Set(stages.map(st=>st.id)).size,43);
   for(let n=1;n<=10;n++){
     const i=stages.findIndex(st=>st.id==="count-"+n);
     assert.equal(stages[i].kind,"count");
@@ -218,3 +245,13 @@ test("quantity choices do not repeat the previous animal or mix two fish types",
   }
 });
 
+test("ordinal lesson answers distinguish direction, quantity, and two-axis positions",()=>{
+  const start=source.indexOf("function makeOrdinal("),end=source.indexOf("function chooseOrdinal(",start);
+  const make=vm.runInNewContext(source.slice(start,end)+";makeOrdinal");
+  assert.deepEqual(plain(make("directions").rounds.map(problem=>problem.answer)),[2,5,3,4,3,7]);
+  const cardinality=plain(make("cardinality").rounds);
+  assert.deepEqual(cardinality.map(problem=>problem.answer),[7,3,3,3,1]);
+  assert.deepEqual(cardinality[3].marked,cardinality[4].marked,"same marked object, different questions");
+  assert.deepEqual(cardinality[3].pictures,cardinality[4].pictures);
+  assert.deepEqual(plain(make("grid").rounds.map(problem=>problem.answer)),[5,7,7,10]);
+});

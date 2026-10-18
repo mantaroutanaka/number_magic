@@ -19,7 +19,12 @@ for(let n=6;n<=10;n++){
   addCountingStages(n,2);
   STAGES.push({id:"fiveplus-"+n,kind:"pair",target:n,a:5,chapter:2,name:"5と いくつで "+n+"？"});
 }
-for(let a=1;a<=5;a++)STAGES.push({id:"make10-"+a,kind:"pair",target:10,a:a,chapter:3,name:a+"と いくつで 10？"});
+STAGES.push(
+  {id:"ordinal-directions",kind:"ordinal",mode:"directions",chapter:3,name:"なんばんめかな"},
+  {id:"ordinal-cardinality",kind:"ordinal",mode:"cardinality",chapter:3,name:"いくつと なんばんめ"},
+  {id:"ordinal-grid",kind:"ordinal",mode:"grid",chapter:3,name:"たて・よこの ばしょ"}
+);
+for(let a=1;a<=5;a++)STAGES.push({id:"make10-"+a,kind:"pair",target:10,a:a,chapter:4,name:a+"と いくつで 10？"});
 STAGES.forEach(stage=>stage.chapter++);
 STAGES.unshift(
   {id:"compare-more",kind:"compare",chapter:0,name:"どちらがおおい？"},
@@ -33,7 +38,8 @@ const CHAPTERS = [
   {name:"① 1〜5を かぞえよう",sub:"えを かぞえる → その かずを さがす",icon:"🔎"},
   {name:"② 5を つくろう",sub:"2つの タイルで 5を つくる",icon:"🌱"},
   {name:"③ 6〜10を かぞえて つくろう",sub:"かぞえる → えらぶ → 5と あといくつ？",icon:"🌈"},
-  {name:"④ 10を つくろう",sub:"2つの タイルで 10を つくる",icon:"🏰"}
+  {name:"④ なんばんめかな",sub:"むき・じゅんばん・たてと よこの ばしょ",icon:"📍"},
+  {name:"⑤ 10を つくろう",sub:"2つの タイルで 10を つくる",icon:"🏰"}
 ];
 const KEY = "number-magic-learning-v2";
 function migrateProgress(p){
@@ -86,6 +92,7 @@ function enter(i){
   state.groups=STAGES[i].kind==="quantity"?quantityGroups(STAGES[i]):[];
   state.intro=makeIntro(STAGES[i].kind);
   state.measure=makeMeasurement(STAGES[i].kind);
+  state.ordinal=STAGES[i].kind==="ordinal"?makeOrdinal(STAGES[i].mode):null;
   state.selected=null;state.quantityShown=0;state.quantityChecked=false;state.quantityCounting=false;
   state.screen="stage";state.index=i;state.objects=STAGES[i].kind==="count"?shuffledObjects(STAGES[i]):[];state.found=[];state.first=null;state.second=null;state.feedback="";state.win=false;state.free=false;
   progress.last=STAGES[i].id;save();render();window.scrollTo(0,0);
@@ -115,7 +122,7 @@ function home(){
   add(acts,button(progress.done.length?"つづきから あそぶ":"はじめから あそぶ",()=>enter(unlocked()),"btn btn-primary"),button("じゆうに ためす",enterFree,"btn btn-secondary"));
   hero.append(acts);wrap.append(hero);
   const road=el("div","learning-road");
-  add(road,el("strong","","この じゅんばんで あそぶよ"),el("p","","くらべる・なかまわけ → ① 1〜5を かぞえる → ② 5を つくる → ③ 6〜10を かぞえて 5から ふやす → ④ 10を つくる"));
+  add(road,el("strong","","この じゅんばんで あそぶよ"),el("p","","くらべる・なかまわけ → ① 1〜5を かぞえる → ② 5を つくる → ③ 6〜10を かぞえて 5から ふやす → ④ なんばんめ・ばしょ → ⑤ 10を つくる"));
   wrap.append(road);
   CHAPTERS.forEach((ch,k)=>{
     const group=el("section","chapter");
@@ -216,6 +223,106 @@ function quantityGroups(stage){
   const counts=[stage.n,...nearby];
   return shuffle(counts.map((count,i)=>({id:"q"+i,emoji:choices[i][0],thing:choices[i][1],count})));
 }
+
+function makeOrdinal(mode){
+  let rounds;
+  if(mode==="directions"){
+    rounds=[
+      {direction:"ひだり",n:7,rank:3},
+      {direction:"みぎ",n:7,rank:2},
+      {direction:"うえ",n:6,rank:4,vertical:true},
+      {direction:"した",n:6,rank:2,vertical:true},
+      {direction:"まえ",n:10,rank:4,queue:true},
+      {direction:"うしろ",n:10,rank:3,queue:true}
+    ].map(problem=>({...problem,type:"pick",answer:["みぎ","した","うしろ"].includes(problem.direction)?problem.n-problem.rank:problem.rank-1,prompt:problem.direction+"から "+problem.rank+"ばんめを えらぼう。"}));
+  }else if(mode==="cardinality"){
+    rounds=[
+      {type:"number",n:7,prompt:"ぜんぶで いくつ あるかな？",answer:7,why:"「いくつ」は、ぜんぶの かず。7こ あるね。"},
+      {type:"pick",n:7,direction:"ひだり",rank:4,prompt:"ひだりから 4ばんめを ひとつ えらぼう。",answer:3},
+      {type:"number",n:7,marked:[0,1,2],prompt:"ひだりから 3こに しるしを つけたよ。しるしは いくつ？",answer:3,why:"「ひだりから 3こ」は、はしから 3こぶんの まとまりだね。"},
+      {type:"number",n:7,marked:[2],prompt:"しるしが あるのは、ひだりから なんばんめ？",answer:3,why:"「3ばんめ」は、ひだりから かぞえた ばしょ。ひとつの ばしょを あらわすよ。"},
+      {type:"number",n:7,marked:[2],prompt:"こんどは、しるしが ついた ものは いくつ？",answer:1,why:"ばしょは 3ばんめ。でも、しるしが ついた ものの かずは 1こだね。"}
+    ];
+  }else{
+    rounds=[
+      {rows:3,cols:3,row:2,col:3,fromRow:"うえ",fromCol:"ひだり"},
+      {rows:3,cols:3,row:3,col:2,fromRow:"うえ",fromCol:"ひだり"},
+      {rows:3,cols:4,row:2,col:1,fromRow:"した",fromCol:"みぎ"},
+      {rows:3,cols:4,row:1,col:3,fromRow:"した",fromCol:"ひだり"}
+    ].map(problem=>{
+      const r=problem.fromRow==="うえ"?problem.row-1:problem.rows-problem.row;
+      const c=problem.fromCol==="ひだり"?problem.col-1:problem.cols-problem.col;
+      return {...problem,n:problem.rows*problem.cols,type:"grid",answer:r*problem.cols+c,prompt:problem.fromRow+"から "+problem.row+"ばんめ、"+problem.fromCol+"から "+problem.col+"ばんめの ばしょは？"};
+    });
+  }
+  const pictures=["🐶","🐱","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐸"];
+  rounds=rounds.map(problem=>({...problem,pictures:problem.type==="grid"?Array(problem.n).fill("🌼"):pictures.slice(0,problem.n)}));
+  return {rounds,round:0,solved:false,mode};
+}
+function chooseOrdinal(answer){
+  const task=state.ordinal,problem=task.rounds[task.round];
+  if(state.win||task.solved||!Number.isInteger(answer)||answer<(problem.type==="number"?1:0)||answer>=(problem.type==="number"?11:problem.n))return;
+  state.selected=answer;
+  if(answer===problem.answer){
+    state.feedback="";task.solved=true;
+    if(task.round===task.rounds.length-1)finish();
+  }else state.feedback=problem.type==="grid"?"たてと よこを、きかれた はしから べつべつに かぞえて みよう。":problem.type==="number"?"「いくつ」と「なんばんめ」、どちらを きかれているかな？":"かぞえはじめる はしを たしかめよう。そこを 1ばんめに するよ。";
+  render();
+}
+function nextOrdinal(){
+  const task=state.ordinal;
+  if(!task.solved||task.round>=task.rounds.length-1)return;
+  task.round++;task.solved=false;state.selected=null;state.feedback="";render();
+}
+function ordinalGame(){
+  const st=STAGES[state.index],task=state.ordinal,problem=task.rounds[task.round],body=el("div","");
+  add(body,el("p","round-progress",(task.round+1)+" / "+task.rounds.length+" もん"),button("🔊 もんだいを きく",()=>speak(problem.prompt),"tool"));
+  const board=el("section","ordinal-board");
+  board.append(el("p","ordinal-edge",problem.type==="grid"?"↑ うえ":problem.vertical?"↑ うえ":problem.queue?"まえ ←　　→ うしろ":"ひだり ←　　→ みぎ"));
+  if(problem.type==="grid")board.append(el("p","ordinal-edge","ひだり ←　　→ みぎ"));
+  const cells=el("div","ordinal-cells"+(problem.vertical?" vertical":"")+(problem.type==="grid"?" plane":""));
+  cells.style.gridTemplateColumns="repeat("+(problem.type==="grid"?problem.cols:problem.vertical?1:problem.n)+",minmax(0,1fr))";
+  for(let i=0;i<problem.n;i++){
+    const marked=problem.marked&&problem.marked.includes(i);
+    const cell=problem.type==="number"?el("div","ordinal-cell"):button("",()=>chooseOrdinal(i),"ordinal-cell"+(state.selected===i?" selected":""),task.solved);
+    if(marked)cell.className+=" marked";
+    cell.append(el("span","ordinal-picture",problem.pictures[i]));
+    if(marked)cell.append(el("span","ordinal-mark","★"));
+    if(problem.type!=="number"){cell.setAttribute("aria-label",problem.type==="grid"?"ばしょ "+(i+1)+"を えらぶ":problem.pictures[i]+"を えらぶ");cell.setAttribute("aria-pressed",String(state.selected===i));}
+    if(task.solved&&problem.type==="pick"){
+      const reverse=["みぎ","した","うしろ"].includes(problem.direction);
+      cell.append(el("span","ordinal-index",(reverse?problem.n-i:i+1)+"ばん"));
+    }
+    if(task.solved&&problem.type==="grid"){
+      const row=Math.floor(i/problem.cols),col=i%problem.cols;
+      cell.append(el("span","ordinal-index",(problem.fromRow==="うえ"?row+1:problem.rows-row)+"・"+(problem.fromCol==="ひだり"?col+1:problem.cols-col)));
+    }
+    cells.append(cell);
+  }
+  board.append(cells);
+  if(problem.vertical||problem.type==="grid")board.append(el("p","ordinal-edge","↓ した"));
+  body.append(board);
+  if(problem.type==="number"){
+    const answers=el("div","ordinal-answers");
+    for(let n=1;n<=10;n++){
+      const b=button(n,()=>chooseOrdinal(n),"tool"+(state.selected===n?" selected":""),task.solved);
+      b.setAttribute("aria-label",n+"を えらぶ");answers.append(b);
+    }
+    body.append(answers);
+  }
+  if(state.feedback)body.append(feedback());
+  if(task.solved){
+    const note=problem.why||(problem.type==="grid"?"たては "+problem.fromRow+"から "+problem.row+"ばんめ、よこは "+problem.fromCol+"から "+problem.col+"ばんめ。ふたつの てがかりで、ひとつの ばしょが きまるね。":problem.direction+"の はしを 1ばんめに して かぞえると、"+problem.rank+"ばんめだね。");
+    const explanation=el("section","set-explanation");
+    add(explanation,el("h2","","できたね！"),el("p","",note),button("🔊 たしかめる おはなし",()=>speak(note),"tool"));
+    if(!state.win)explanation.append(button("つぎの もんだい →",nextOrdinal,"btn btn-primary quantity-check"));
+    body.append(explanation);
+  }
+  if(state.win)body.append(success(st.name+"、できたね！","かずで じゅんばんや ばしょを あらわせたね。"));
+  body.append(button("⟳ はじめから",()=>{state.ordinal=makeOrdinal(st.mode);state.selected=null;state.feedback="";state.win=false;render();},"tool"));
+  return gameShell(CHAPTERS[st.chapter].name,st.name,problem.prompt,body);
+}
+
 
 function makeMeasurement(kind){
   const sets={
@@ -689,7 +796,7 @@ function pairGame(){
 }
 function render(){
   const kind=state.screen==="stage"?STAGES[state.index].kind:null;
-  ROOT.replaceChildren(state.screen==="home"?home():kind==="compare"||kind==="classify"?introGame():["capacity","length","area"].includes(kind)?measurementGame():kind==="count"?counting():kind==="quantity"?quantityGame():pairGame());
+  ROOT.replaceChildren(state.screen==="home"?home():kind==="compare"||kind==="classify"?introGame():kind==="ordinal"?ordinalGame():["capacity","length","area"].includes(kind)?measurementGame():kind==="count"?counting():kind==="quantity"?quantityGame():pairGame());
 }
 render();
 if("serviceWorker" in navigator && location.protocol==="https:"){
