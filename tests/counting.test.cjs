@@ -129,6 +129,9 @@ test("intro games allow retries, save completion, and lead into original stages"
       if(mode==="place"){
         game.chooseTwenty(problem.answer);
         assert.equal(task.solved,false,"must construct both digits");
+        game.setTwentyDigit(0,9);game.setTwentyDigit(1,9);
+        game.chooseTwenty(99);
+        assert.ok(game.state.feedback,"out-of-range digit combinations explain the error");
         game.setTwentyDigit(0,1);game.setTwentyDigit(1,0);
         game.chooseTwenty(10);
         assert.equal(task.solved,false);

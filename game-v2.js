@@ -277,7 +277,7 @@ function setTwentyDigit(place,digit){
 }
 function chooseTwenty(answer){
   const task=state.twenty,problem=task.rounds[task.round];
-  if(task.solved||state.win||!Number.isInteger(answer)||answer<0||answer>20)return;
+  if(task.solved||state.win||!Number.isInteger(answer)||answer<0||answer>(task.mode==="place"?99:20))return;
   if(task.mode==="count"&&task.tapped.length!==problem.n)return;
   if(task.mode==="place"&&(task.digits.some(digit=>digit===null)||answer!==task.digits[0]*10+task.digits[1]))return;
   state.selected=answer;
