@@ -235,6 +235,32 @@ function quantityGroups(stage){
   return shuffle(counts.map((count,i)=>({id:"q"+i,emoji:choices[i][0],thing:choices[i][1],count})));
 }
 
+function calculationStory(problem){
+  if(problem.op==="+")return "りんごが "+problem.a+"こ あります。"+problem.b+"こ もらいました。あわせて なんこ？";
+  return "りんごが "+problem.a+"こ あります。"+problem.b+"こ わたしました。のこりは なんこ？";
+}
+function calculationStrategy(problem){
+  const {a,b,op,result}=problem,ones=a%10;
+  if(op==="+"){
+    if(a===10&&b===10)return "10の まとまりが 1こと 1こで 2こ。だから 20だね。";
+    if(a>=10&&b<10&&ones+b<10)return a+"を 10と "+ones+"に わけるよ。ばらの "+ones+"と "+b+"で "+(ones+b)+"。10と あわせて "+result+"だね。";
+    if(a>=10&&b<10&&ones+b===10)return "ばらの "+ones+"と "+b+"で 10。もとの 10と あわせて、10の まとまりが 2こで 20だね。";
+    return a+"と "+b+"を あわせると "+result+"。10の まとまりと ばらで たしかめよう。";
+  }
+  if(b===10)return a+"は 10と "+ones+"。10の まとまりを 1こ とると、"+result+"が のこるね。";
+  if(a===20&&b<10)return "20は 10が 2こ。ひとまとまりを ばらの 10こに もどして、"+b+"こ とると "+(10-b)+"こ。のこした 10と あわせて "+result+"だね。";
+  if(a>=10&&b<=ones)return a+"は 10と "+ones+"。ばらの "+ones+"から "+b+"を とると "+(ones-b)+"。10と あわせて "+result+"だね。";
+  return a+"から "+b+"を とると "+result+"。タイルの のこりを たしかめよう。";
+}
+function numberLine(selected){
+  const box=el("section","learning-number-line");
+  add(box,el("strong","","かずの せんで たしかめよう"),el("p","","めもりは おなじ はば。みぎへ 1ずつ おおきくなるよ。"));
+  const line=el("div","number-line-ticks");
+  for(let n=10;n<=20;n++)line.append(el("span",n===selected?"chosen":"",n));
+  box.append(line);return box;
+}
+
+
 function makeTwenty(mode){
   const numbers=Array.from({length:10},(_,i)=>i+11);
   let rounds;
@@ -323,7 +349,7 @@ function arithmeticTiles(problem,reveal){
 }
 function twentyGame(){
   const st=STAGES[state.index],task=state.twenty,problem=task.rounds[task.round],mode=task.mode,body=el("div","");
-  add(body,el("p","round-progress",(task.round+1)+" / "+task.rounds.length+" もん"),button("🔊 もんだいを きく",()=>speak(problem.prompt),"tool"));
+  add(body,el("p","round-progress",(task.round+1)+" / "+task.rounds.length+" もん"),button("🔊 もんだいを きく",()=>speak((mode==="calculate"?calculationStory(problem)+" ":"")+problem.prompt+(problem.equation?" "+problem.equation.replace("□","しかく"):"")),"tool"));
   if(mode==="count"){
     const scene=el("div","twenty-scene");
     for(let i=0;i<problem.n;i++){
@@ -358,7 +384,9 @@ function twentyGame(){
     const series=el("div","number-series");
     problem.series.forEach((n,i)=>series.append(el("span",i===problem.hole?"series-hole":"",i===problem.hole&&!task.solved?"□":n)));
     body.append(series);
+    body.append(numberLine(state.selected));
   }else{
+    if(mode==="calculate")body.append(el("p","arithmetic-story",calculationStory(problem)));
     body.append(el("div","twenty-equation",problem.equation));
     body.append(arithmeticTiles(problem,task.solved));
   }
@@ -384,7 +412,7 @@ function twentyGame(){
     }else if(mode==="sequence"){
       explanation=problem.series.join("、")+"。1ずつ "+(problem.series[0]<problem.series[1]?"ふえる":"へる")+" ならびだね。";
     }else{
-      explanation=problem.result+"は、"+problem.a+"と "+problem.b+"を "+(problem.op==="+"?"たした":"ひいた")+" かず。";
+      explanation=calculationStrategy(problem);
       note.append(baseTen(problem.result));
     }
     add(note,el("p","",explanation),button("🔊 たしかめる おはなし",()=>speak(explanation),"tool"));
@@ -561,6 +589,19 @@ function measureShape(kind,item,reveal){
 function measurementResult(task){
   const problem=task.rounds[task.round],panel=el("section","comparison-result");
   const kind=task.kind,unit=kind==="capacity"?"はい":kind==="length"?"ます":"ます";
+  if(kind==="area"){
+    panel.append(el("h3","","まず、かどを そろえて かさねよう"));
+    const overlay=el("div","area-overlay");
+    const maxWidth=Math.max(...problem.choices.map(item=>item.w)),maxHeight=Math.max(...problem.choices.map(item=>item.h));
+    overlay.style.width=(maxWidth*22)+"px";overlay.style.height=(maxHeight*22)+"px";
+    problem.choices.forEach((item,i)=>{
+      const sheet=el("span","area-layer layer-"+i);
+      sheet.style.width=(item.w*22)+"px";sheet.style.height=(item.h*22)+"px";overlay.append(sheet);
+    });
+    const [a,b]=problem.choices;
+    const nested=(a.w<=b.w&&a.h<=b.h)||(b.w<=a.w&&b.h<=a.h);
+    add(panel,el("p","","あは みどり、いは オレンジ。"),overlay,el("p","",nested?"ひとつの かみが もうひとつの なかに おさまるね。つつむ ほうが ひろいよ。":"どちらも はみだす ところが あるね。これだけでは きめられないから、おなじ ますの いくつぶんかで くらべよう。"));
+  }
   const title=kind==="capacity"?"おなじ コップに うつしたよ":kind==="length"?"はしを そろえたよ":"おなじ おおきさの ますで くらべよう";
   add(panel,el("h2","",title),el("p","",kind==="capacity"?"どの コップも おなじ おおきさ。すべて いっぱいに して くらべるよ。":kind==="length"?"ひだりの はしを そろえて、おなじ ながさの ますで くらべるよ。":"ますの おおきさは みんな おなじ。かたちが ちがっても、ますの かずで くらべられるよ。"));
   problem.choices.forEach((item,i)=>{

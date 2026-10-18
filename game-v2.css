@@ -243,3 +243,13 @@ button:focus-visible{outline:4px solid #e6a629;outline-offset:3px}
 .arithmetic-unit.filled{background:#41a6b5;border:1px solid #26818e}
 .arithmetic-unit.added{background:#ecb34d;border:1px solid #c09138}
 .arithmetic-unit.removed{background:#e0ece7;border:2px dashed #a28c82;color:#866456;font-weight:900}
+.arithmetic-story{background:#fff5d6;border:2px solid #e9d5a3;border-radius:15px;padding:15px;font-weight:900;line-height:1.9}
+.learning-number-line{padding:13px 5px;background:#eef8f4;border-radius:13px;margin:14px 0}
+.learning-number-line p{font-size:13px;font-weight:800}
+.number-line-ticks{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));margin:20px 0 8px;border-top:3px solid #458e7c}
+.number-line-ticks span{text-align:center;border-left:1px solid #458e7c;padding-top:8px;font-size:clamp(12px,2.4vw,17px);font-weight:900}
+.number-line-ticks .chosen{background:#ffe2a4;border-radius:0 0 8px 8px}
+.area-overlay{position:relative;margin:18px 8px;box-sizing:content-box}
+.area-layer{position:absolute;left:0;top:0;box-sizing:content-box;border:2px solid;opacity:.65}
+.area-layer.layer-0{background:#63bd90;border-color:#17794e}
+.area-layer.layer-1{background:#f1ab56;border-color:#a86a19}
