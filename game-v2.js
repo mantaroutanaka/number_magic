@@ -219,40 +219,85 @@ function makeIntro(kind){
     return {groups:counts.map((count,i)=>({id:"intro-"+i,count,emoji,thing})),answer:counts.indexOf(4)};
   }
   if(kind==="classify"){
-    const families=[
-      {name:"くだもの",examples:["🍎","🍇"],answer:"🍌",others:["🚗","👟"]},
-      {name:"のりもの",examples:["🚗","🚌"],answer:"🚒",others:["🍎","👟"]},
-      {name:"どうぶつ",examples:["🐶","🐱"],answer:"🐰",others:["🚗","🍌"]}
+    // Each rule names the set explicitly: an object can belong to other sets too.
+    const problems=[
+      {rule:"きつねの なかま",members:[["🦊","きつね"]],odd:["🦆","あひる"],why:"あひるは きつねでは ないね。どちらも どうぶつの なかまには はいるよ。"},
+      {rule:"どうぶつの なかま",members:[["🐶","いぬ"],["🐱","ねこ"],["🐘","ぞう"],["🦁","らいおん"],["🐰","うさぎ"],["🐢","かめ"]],odd:["🌷","はな"],why:"はなは どうぶつでは ないね。でも、どうぶつも はなも いきものだよ。"},
+      {rule:"くるまの なかま",members:[["🚗","くるま"],["🚌","ばす"],["🚕","たくしー"],["🚒","しょうぼうしゃ"],["🚑","きゅうきゅうしゃ"]],odd:["🦋","ちょうちょ"],why:"ちょうちょは むしの なかま。くるまの なかまには はいらないね。"},
+      {rule:"くだものの なかま",members:[["🍎","りんご"],["🍌","ばなな"],["🍇","ぶどう"],["🍊","みかん"],["🍓","いちご"]],odd:["👟","くつ"],why:"くつは みにつける もの。くだものの なかまには はいらないね。"},
+      {rule:"えんじんや もーたーで はしる のりもの",members:[["🚗","くるま"],["🚌","ばす"],["🚕","たくしー"],["🚒","しょうぼうしゃ"],["🚑","きゅうきゅうしゃ"],["🚚","とらっく"]],odd:["🚲","じてんしゃ"],why:"ここでの じてんしゃは でんどうでは なく、あしで こいで はしるよ。みんな のりものだけど、この なかまの きまりからは はずれるね。",note:"じてんしゃは、でんどうでは ない ものと するよ。"},
+      {rule:"いまも しぜんの なかで いきている どうぶつ",members:[["🐘","ぞう"],["🦒","きりん"],["🦁","らいおん"],["🐢","かめ"],["🐊","わに"],["🦓","しまうま"]],odd:["🦤","どーどー"],why:"どーどーは むかし いきていた どうぶつ。ぜつめつして、いまは いないよ。どうぶつの なかまだけど、いまも いきている どうぶつの なかまからは はずれるね。"},
+      {rule:"たべる ときに つかう しょっき・どうぐ",members:[["🍽️","おさら"],["🥣","おわん"],["🥄","すぷーん"],["🍴","ふぉーく"],["🥢","はし"],["☕","かっぷ"]],odd:["🪏","しゃべる"],why:"しゃべるは つちを ほる ときに つかうよ。すぷーんと にているけど、たべる ときの どうぐでは ないね。"},
+      {rule:"そらを とんで いどうできる どうぶつ",members:[["🦋","ちょうちょ"],["🐝","はち"],["🦅","わし"],["🦇","こうもり"],["🦉","ふくろう"]],odd:["🐧","ぺんぎん"],why:"ぺんぎんは とりだけど、そらは とべないよ。こうもりは とりでは ないけど、そらを とぶ なかまに はいるね。"},
+      {rule:"みずの なかで くらす どうぶつ",members:[["🐟","さかな"],["🐙","たこ"],["🐬","いるか"],["🐋","くじら"],["🦈","さめ"]],odd:["🦒","きりん"],why:"きりんは りくで くらすよ。いるかや くじらは さかなでは ないけど、みずの なかで くらす なかまだね。"},
+      {rule:"おんがくを かなでる がっき",members:[["🎸","ぎたー"],["🎻","ばいおりん"],["🎺","とらんぺっと"],["🥁","たいこ"],["🪈","ふえ"]],odd:["🔨","かなづち"],why:"かなづちも おとは でるけど、ここでは ものを つくる どうぐ。おんがくを かなでる がっきの なかまから はずれるね。"}
     ];
-    const family=shuffle(families)[0],choices=shuffle([family.answer,...family.others]);
-    return {family,choices,answer:choices.indexOf(family.answer)};
+    const rounds=problems.map(problem=>{
+      const members=Array.from({length:8},(_,i)=>({picture:problem.members[i%problem.members.length],odd:false}));
+      const choices=shuffle([...members,{picture:problem.odd,odd:true}]);
+      return {...problem,choices,answer:choices.findIndex(item=>item.odd)};
+    });
+    return {rounds,round:0,solved:false};
   }
   return null;
 }
 function chooseIntro(index){
-  if(state.win)return;
+  const task=state.intro,compare=STAGES[state.index].kind==="compare";
+  if(state.win||(!compare&&task.solved))return;
+  const problem=compare?task:task.rounds[task.round];
+  if(!Number.isInteger(index)||index<0||index>=(compare?2:problem.choices.length))return;
   state.selected=index;
-  if(index===state.intro.answer){state.feedback="";finish();}
-  else state.feedback=STAGES[state.index].kind==="compare"
-    ?"1こずつ ならべて、あまる ほうを さがそう。"
-    :"おてほんの えは どんな なかまかな？ もういちど みてみよう。";
+  if(index===problem.answer){
+    state.feedback="";
+    if(compare)finish();
+    else{
+      task.solved=true;
+      if(task.round===task.rounds.length-1)finish();
+    }
+  }else state.feedback=compare
+    ?"ならべると、こちらは すくないね。あまる ほうを えらびなおそう。"
+    :"この えは「"+problem.rule+"」に はいるよ。きまりから はずれる ものを さがそう。";
   render();
+}
+function nextIntroRound(){
+  const task=state.intro;
+  if(!task.solved||task.round>=task.rounds.length-1)return;
+  task.round++;task.solved=false;state.selected=null;state.feedback="";render();
+}
+function comparisonResult(task){
+  const panel=el("section","comparison-result");
+  add(panel,el("h2","","1こずつ ならべて くらべよう"),el("p","","おなじ れつの えが 1たい1の ぺあ。あまった えが ある ほうが おおいね。"));
+  const grid=el("div","comparison-grid");
+  const max=Math.max(...task.groups.map(group=>group.count)),min=Math.min(...task.groups.map(group=>group.count));
+  task.groups.forEach((group,i)=>grid.append(el("strong","comparison-label",(i===0?"ひだり":"みぎ")+(state.selected===i?"（えらんだ ほう）":""))));
+  for(let row=0;row<max;row++)task.groups.forEach(group=>{
+    const present=row<group.count;
+    const cell=el("span","comparison-cell"+(!present?" empty":row>=min?" surplus":" paired"),present?group.emoji:"");
+    cell.setAttribute("aria-label",present?(row>=min?"あまった ":"ぺあの ")+group.thing:"ぺあが ない ます");
+    grid.append(cell);
+  });
+  panel.append(grid);
+  panel.append(el("p","comparison-summary","ひだり "+task.groups[0].count+"こ、みぎ "+task.groups[1].count+"こ。"+(max-min)+"こ あまるよ。"));
+  return panel;
 }
 function introGame(){
   const st=STAGES[state.index],task=state.intro,body=el("div","");
-  const compare=st.kind==="compare";
+  const compare=st.kind==="compare",problem=compare?null:task.rounds[task.round];
   if(!compare){
-    const sample=el("div","count-task");
-    add(sample,el("strong","","おてほん"),el("span","task-emoji",task.family.examples.join(" ")));
-    body.append(sample);
+    body.append(el("p","round-progress",(task.round+1)+" / "+task.rounds.length+" もん"));
+    const rule=el("section","set-rule");
+    add(rule,el("strong","","なかまの きまり"),el("p","",problem.rule));
+    if(problem.note)rule.append(el("p","muted-note",problem.note));
+    body.append(rule);
+    body.append(button("🔊 きまりを きく",()=>speak(problem.rule+(problem.note||"")),"tool"));
   }
   body.append(el("p","quantity-instruction",compare
-    ?"1こずつ くらべて、おおい ほうを タップしよう。"
-    :"おてほんと おなじ なかまの えを タップしよう。"));
-  const options=el("div","intro-options"+(compare?" compare-options":""));
-  const choices=compare?task.groups:task.choices;
+    ?"おおい ほうを タップしよう。えらんだら、1こずつ ならべて たしかめるよ。"
+    :"この きまりに はいらない ものを、ひとつ さがそう。"));
+  const options=el("div",compare?"intro-options compare-options":"odd-options");
+  const choices=compare?task.groups:problem.choices;
   choices.forEach((item,i)=>{
-    const b=button("",()=>chooseIntro(i),"quantity-option"+(state.selected===i?" selected":""),state.win);
+    const b=button("",()=>chooseIntro(i),"quantity-option"+(state.selected===i?" selected":""),state.win||(!compare&&task.solved));
     b.setAttribute("aria-pressed",String(state.selected===i));
     if(compare){
       b.setAttribute("aria-label",(i===0?"ひだり":"みぎ")+"の "+item.thing+"を えらぶ");
@@ -260,21 +305,32 @@ function introGame(){
       for(let j=0;j<item.count;j++)pictures.append(el("span","quantity-picture",item.emoji));
       b.append(pictures);
     }else{
-      b.setAttribute("aria-label",item+"を えらぶ");
-      b.append(el("span","friend-picture",item));
+      b.setAttribute("aria-label",item.picture[1]+"を えらぶ");
+      add(b,el("span","odd-picture",item.picture[0]),el("span","quantity-name",item.picture[1]));
     }
     b.append(el("span","quantity-pick",state.selected===i?"✓ これに する":"えらぶ"));
     options.append(b);
   });
   body.append(options);
+  if(compare&&state.selected!==null)body.append(comparisonResult(task));
+  if(!compare&&task.solved){
+    const explanation=el("section","set-explanation");
+    add(explanation,el("h2","","みつけたね！"),el("p","",problem.why));
+    explanation.append(button("🔊 おはなしを きく",()=>speak(problem.why),"tool"));
+    if(!state.win)explanation.append(button("つぎの もんだい →",nextIntroRound,"btn btn-primary quantity-check"));
+    body.append(explanation);
+  }
   if(state.win)body.append(success(compare
-    ?"こちらが おおいね！ 1こずつ ならべると、2こ あまるよ。"
-    :task.family.examples.join(" ")+" と "+task.family.answer+" は "+task.family.name+"の なかまだね！"));
+    ?"あまる ほうが おおいね！"
+    :"いろいろな きまりで なかまわけ できたね！",
+    compare?null:"おなじ ものでも、きまりが かわると はいる なかまが かわるよ。"));
   else if(state.feedback)body.append(feedback());
-  body.append(button("⟳ ちがう えで ためす",()=>{state.intro=makeIntro(st.kind);state.selected=null;state.feedback="";state.win=false;render();},"tool"));
+  body.append(button(compare?"⟳ ちがう えで ためす":"⟳ はじめの もんだいから",()=>{
+    state.intro=makeIntro(st.kind);state.selected=null;state.feedback="";state.win=false;render();
+  },"tool"));
   return gameShell(CHAPTERS[st.chapter].name,st.name,compare
     ?"どちらがおおい？ えを くらべよう。"
-    :"なかまはどれ？ おてほんと くらべよう。",body);
+    :"なかまはどれ？ きまりに はいらない ものを さがそう。",body);
 }
 
 function resetCounting(){

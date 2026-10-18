@@ -48,20 +48,40 @@ test("intro games allow retries, save completion, and lead into original stages"
   const root=new Node();
   const context={document:{getElementById:()=>root,createElement:()=>new Node()},window:{scrollTo(){}},localStorage:{getItem:()=>null,setItem(){}},navigator:{},location:{protocol:"http:"},clearTimeout,setTimeout};
   vm.createContext(context);
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,state,progress,STAGES,unlocked};})();"),context);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,state,progress,STAGES,unlocked};})();"),context);
   const game=context.game;
-  for(let i=0;i<2;i++){
-    game.enter(i);
-    const intro=game.state.intro,answer=intro.answer;
-    game.chooseIntro((answer+1)%(i===0?2:3));
-    assert.equal(game.state.win,false);
-    assert.equal(game.state.intro,intro,"wrong answer preserves task");
-    game.chooseIntro(answer);
-    assert.equal(game.state.win,true);
-    assert.ok(game.progress.done.includes(game.STAGES[i].id));
-    game.chooseIntro(answer);
-    assert.equal(game.progress.done.length,i+1);
+  game.enter(0);
+  const intro=game.state.intro;
+  game.chooseIntro(1-intro.answer);
+  assert.equal(game.state.win,false);
+  assert.equal(game.state.intro,intro);
+  assert.notEqual(game.state.selected,null,"wrong answers also reveal alignment");
+  const panel=game.comparisonResult(intro),grid=panel.children.find(node=>node.className==="comparison-grid");
+  assert.equal(grid.children.filter(node=>node.className.includes("surplus")).length,2);
+  assert.equal(grid.children.filter(node=>node.className.includes("empty")).length,2);
+  assert.equal(grid.children.filter(node=>node.className.includes("paired")).length,4);
+  game.chooseIntro(intro.answer);
+  assert.equal(game.state.win,true);
+  game.enter(1);
+  for(let i=0;i<game.state.intro.rounds.length;i++){
+    const task=game.state.intro,problem=task.rounds[i];
+    game.nextIntroRound();
+    assert.equal(task.round,i,"cannot skip unsolved questions");
+    game.chooseIntro((problem.answer+1)%9);
+    assert.equal(task.solved,false);
+    assert.equal(game.state.intro,task);
+    game.chooseIntro(problem.answer);
+    assert.equal(task.solved,true);
+    assert.equal(game.state.win,i===task.rounds.length-1);
+    if(i<task.rounds.length-1){
+      assert.ok(!game.progress.done.includes("find-friends"),"no completion before final question");
+      game.nextIntroRound();
+      assert.equal(task.round,i+1);
+      assert.equal(stateSelected(game),null);
+    }
   }
+  function stateSelected(game){return game.state.selected;}
+  assert.deepEqual(Array.from(game.progress.done),["compare-more","find-friends"]);
   assert.equal(game.unlocked(),2);
   game.enter(2);
   assert.equal(game.STAGES[game.state.index].id,"count-1");
@@ -75,12 +95,18 @@ test("intro generators vary answer positions and keep one clear answer",()=>{
     assert.equal(comparison.groups.filter(g=>g.count===4).length,1);
     sides.add(comparison.answer);
     const friends=make("classify");
-    assert.equal(friends.choices[friends.answer],friends.family.answer);
-    assert.equal(new Set(friends.choices).size,3);
-    positions.add(friends.answer);
+    assert.equal(friends.rounds.length,10);
+    for(const problem of friends.rounds){
+      assert.equal(problem.choices.length,9);
+      assert.equal(problem.choices.filter(choice=>choice.odd).length,1);
+      assert.equal(problem.choices[problem.answer].picture,problem.odd);
+      assert.ok(problem.rule&&problem.why);
+      assert.ok(problem.choices.filter(choice=>!choice.odd).every(choice=>choice.picture!==problem.odd));
+      positions.add(problem.answer);
+    }
   }
   assert.equal(sides.size,2);
-  assert.equal(positions.size,3);
+  assert.equal(positions.size,9);
 });
 
 
