@@ -19,12 +19,12 @@ for(let n=6;n<=10;n++){
   addCountingStages(n,2);
   STAGES.push({id:"fiveplus-"+n,kind:"pair",target:n,a:5,chapter:2,name:"5と いくつで "+n+"？"});
 }
+for(let a=1;a<=5;a++)STAGES.push({id:"make10-"+a,kind:"pair",target:10,a:a,chapter:3,name:a+"と いくつで 10？"});
 STAGES.push(
-  {id:"ordinal-directions",kind:"ordinal",mode:"directions",chapter:3,name:"なんばんめかな"},
-  {id:"ordinal-cardinality",kind:"ordinal",mode:"cardinality",chapter:3,name:"いくつと なんばんめ"},
-  {id:"ordinal-grid",kind:"ordinal",mode:"grid",chapter:3,name:"たて・よこの ばしょ"}
+  {id:"ordinal-directions",kind:"ordinal",mode:"directions",chapter:4,name:"なんばんめかな"},
+  {id:"ordinal-cardinality",kind:"ordinal",mode:"cardinality",chapter:4,name:"いくつと なんばんめ"},
+  {id:"ordinal-grid",kind:"ordinal",mode:"grid",chapter:4,name:"たて・よこの ばしょ"}
 );
-for(let a=1;a<=5;a++)STAGES.push({id:"make10-"+a,kind:"pair",target:10,a:a,chapter:4,name:a+"と いくつで 10？"});
 STAGES.forEach(stage=>stage.chapter++);
 STAGES.unshift(
   {id:"compare-more",kind:"compare",chapter:0,name:"どちらがおおい？"},
@@ -38,8 +38,8 @@ const CHAPTERS = [
   {name:"① 1〜5を かぞえよう",sub:"えを かぞえる → その かずを さがす",icon:"🔎"},
   {name:"② 5を つくろう",sub:"2つの タイルで 5を つくる",icon:"🌱"},
   {name:"③ 6〜10を かぞえて つくろう",sub:"かぞえる → えらぶ → 5と あといくつ？",icon:"🌈"},
-  {name:"④ なんばんめかな",sub:"むき・じゅんばん・たてと よこの ばしょ",icon:"📍"},
-  {name:"⑤ 10を つくろう",sub:"2つの タイルで 10を つくる",icon:"🏰"}
+  {name:"④ 10を つくろう",sub:"2つの タイルで 10を つくる",icon:"🏰"},
+  {name:"⑤ なんばんめかな",sub:"むき・じゅんばん・たてと よこの ばしょ",icon:"📍"}
 ];
 const KEY = "number-magic-learning-v2";
 function migrateProgress(p){
@@ -122,7 +122,7 @@ function home(){
   add(acts,button(progress.done.length?"つづきから あそぶ":"はじめから あそぶ",()=>enter(unlocked()),"btn btn-primary"),button("じゆうに ためす",enterFree,"btn btn-secondary"));
   hero.append(acts);wrap.append(hero);
   const road=el("div","learning-road");
-  add(road,el("strong","","この じゅんばんで あそぶよ"),el("p","","くらべる・なかまわけ → ① 1〜5を かぞえる → ② 5を つくる → ③ 6〜10を かぞえて 5から ふやす → ④ なんばんめ・ばしょ → ⑤ 10を つくる"));
+  add(road,el("strong","","この じゅんばんで あそぶよ"),el("p","","くらべる・なかまわけ → ① 1〜5を かぞえる → ② 5を つくる → ③ 6〜10を かぞえて 5から ふやす → ④ 10を つくる → ⑤ なんばんめ・ばしょ"));
   wrap.append(road);
   CHAPTERS.forEach((ch,k)=>{
     const group=el("section","chapter");

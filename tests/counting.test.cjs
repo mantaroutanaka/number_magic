@@ -113,7 +113,7 @@ test("intro games allow retries, save completion, and lead into original stages"
   for(const id of ["ordinal-directions","ordinal-cardinality","ordinal-grid"]){
     const index=game.STAGES.findIndex(stage=>stage.id===id);
     assert.ok(index>game.STAGES.findIndex(stage=>stage.id==="quantity-10"));
-    assert.ok(index<game.STAGES.findIndex(stage=>stage.id==="make10-1"));
+    assert.ok(index>game.STAGES.findIndex(stage=>stage.id==="make10-5"));
     game.enter(index);
     const task=game.state.ordinal;
     for(let i=0;i<task.rounds.length;i++){
@@ -188,8 +188,8 @@ for(let n=1;n<=5;n++)expectedIds.push("count-"+n,"quantity-"+n);
 for(let a=1;a<=4;a++)expectedIds.push("make5-"+a);
 expectedIds.push("make5-free");
 for(let n=6;n<=10;n++)expectedIds.push("count-"+n,"quantity-"+n,"fiveplus-"+n);
-expectedIds.push("ordinal-directions","ordinal-cardinality","ordinal-grid");
 for(let a=1;a<=5;a++)expectedIds.push("make10-"+a);
+expectedIds.push("ordinal-directions","ordinal-cardinality","ordinal-grid");
 const plain=value=>JSON.parse(JSON.stringify(value));
 test("5 composition follows quantity 5; each 6–10 is counted, chosen, then built from 5",()=>{
   assert.deepEqual(plain(stages.map(st=>st.id)),expectedIds);
