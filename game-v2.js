@@ -23,10 +23,13 @@ for(let a=1;a<=5;a++)STAGES.push({id:"make10-"+a,kind:"pair",target:10,a:a,chapt
 STAGES.forEach(stage=>stage.chapter++);
 STAGES.unshift(
   {id:"compare-more",kind:"compare",chapter:0,name:"どちらがおおい？"},
+  {id:"compare-capacity",kind:"capacity",chapter:0,name:"かさくらべ"},
+  {id:"compare-length",kind:"length",chapter:0,name:"ながさくらべ"},
+  {id:"compare-area",kind:"area",chapter:0,name:"ひろさくらべ"},
   {id:"find-friends",kind:"classify",chapter:0,name:"なかまはどれ？"}
 );
 const CHAPTERS = [
-  {name:"まずは くらべて なかまわけ",sub:"どちらがおおい？ → なかまはどれ？",icon:"🌷"},
+  {name:"まずは くらべて なかまわけ",sub:"かず・かさ・ながさ・ひろさ → なかまはどれ？",icon:"🌷"},
   {name:"① 1〜5を かぞえよう",sub:"えを かぞえる → その かずを さがす",icon:"🔎"},
   {name:"② 5を つくろう",sub:"2つの タイルで 5を つくる",icon:"🌱"},
   {name:"③ 6〜10を かぞえて つくろう",sub:"かぞえる → えらぶ → 5と あといくつ？",icon:"🌈"},
@@ -82,6 +85,7 @@ function enter(i){
   stopQuantityCount();
   state.groups=STAGES[i].kind==="quantity"?quantityGroups(STAGES[i]):[];
   state.intro=makeIntro(STAGES[i].kind);
+  state.measure=makeMeasurement(STAGES[i].kind);
   state.selected=null;state.quantityShown=0;state.quantityChecked=false;state.quantityCounting=false;
   state.screen="stage";state.index=i;state.objects=STAGES[i].kind==="count"?shuffledObjects(STAGES[i]):[];state.found=[];state.first=null;state.second=null;state.feedback="";state.win=false;state.free=false;
   progress.last=STAGES[i].id;save();render();window.scrollTo(0,0);
@@ -212,6 +216,118 @@ function quantityGroups(stage){
   const counts=[stage.n,...nearby];
   return shuffle(counts.map((count,i)=>({id:"q"+i,emoji:choices[i][0],thing:choices[i][1],count})));
 }
+
+function makeMeasurement(kind){
+  const sets={
+    capacity:[
+      [{w:2,h:3},{w:2,h:4}],
+      [{w:1,h:6},{w:4,h:2}],
+      [{w:3,h:3},{w:2,h:4}]
+    ],
+    length:[
+      [{n:4,style:"ribbon"},{n:6,style:"ribbon"}],
+      [{n:5,style:"pencil"},{n:7,style:"pencil"}],
+      [{n:6,style:"train"},{n:4,style:"train"}]
+    ],
+    area:[
+      [{w:3,h:2},{w:4,h:3}],
+      [{w:4,h:2},{w:3,h:3}],
+      [{w:2,h:4},{w:3,h:2}]
+    ]
+  };
+  if(!sets[kind])return null;
+  return {kind,round:0,solved:false,rounds:sets[kind].map(pair=>{
+    const choices=shuffle(pair).map((item,i)=>({...item,label:i===0?"あ":"い",value:kind==="length"?item.n:item.w*item.h}));
+    return {choices,answer:choices[0].value>choices[1].value?0:1};
+  })};
+}
+function chooseMeasurement(index){
+  const task=state.measure;
+  if(state.win||task.solved||!Number.isInteger(index)||index<0||index>1)return;
+  state.selected=index;
+  const problem=task.rounds[task.round];
+  if(index===problem.answer){
+    task.solved=true;state.feedback="";
+    if(task.round===task.rounds.length-1)finish();
+  }else state.feedback="そろえて たしかめよう。もういちど えらんで みよう。";
+  render();
+}
+function nextMeasurement(){
+  const task=state.measure;
+  if(!task.solved||task.round>=task.rounds.length-1)return;
+  task.round++;task.solved=false;state.selected=null;state.feedback="";render();
+}
+function measureShape(kind,item,reveal){
+  const wrap=el("div","measure-shape");
+  if(kind==="capacity"){
+    const vessel=el("div","measure-vessel");
+    vessel.style.width=(item.w*22)+"px";vessel.style.height=(item.h*22+12)+"px";
+    vessel.append(el("span","measure-water"));
+    wrap.append(vessel);
+  }else if(kind==="length"){
+    const track=el("div","measure-track"+(reveal?" aligned":""));
+    const strip=el("div","measure-strip "+item.style);
+    strip.style.width=(item.n/8*100)+"%";
+    if(item.style==="train")for(let i=0;i<item.n;i++)strip.append(el("span","train-car","▰"));
+    track.append(strip);wrap.append(track);
+  }else{
+    const paper=el("div","measure-paper"+(reveal?" gridded":""));
+    paper.style.gridTemplateColumns="repeat("+item.w+",22px)";
+    for(let i=0;i<item.value;i++)paper.append(el("span","paper-square"));
+    wrap.append(paper);
+  }
+  wrap.setAttribute("aria-hidden","true");return wrap;
+}
+function measurementResult(task){
+  const problem=task.rounds[task.round],panel=el("section","comparison-result");
+  const kind=task.kind,unit=kind==="capacity"?"はい":kind==="length"?"ます":"ます";
+  const title=kind==="capacity"?"おなじ コップに うつしたよ":kind==="length"?"はしを そろえたよ":"おなじ おおきさの ますで くらべよう";
+  add(panel,el("h2","",title),el("p","",kind==="capacity"?"どの コップも おなじ おおきさ。すべて いっぱいに して くらべるよ。":kind==="length"?"ひだりの はしを そろえて、おなじ ながさの ますで くらべるよ。":"ますの おおきさは みんな おなじ。かたちが ちがっても、ますの かずで くらべられるよ。"));
+  problem.choices.forEach((item,i)=>{
+    const row=el("div","measure-result-row");
+    row.append(el("strong","",item.label+(state.selected===i?"（えらんだ ほう）":"")));
+    if(kind==="length"){
+      row.append(measureShape(kind,item,true));
+      const ruler=el("div","measure-ruler");
+      for(let j=0;j<8;j++)ruler.append(el("span","",j<item.n?"●":""));
+      row.append(ruler);
+    }else if(kind==="area"){
+      row.append(measureShape(kind,item,true));
+      const tiles=el("div","measure-tiles");
+      for(let j=0;j<item.value;j++)tiles.append(el("span","area-unit"));
+      row.append(tiles);
+    }else{
+      const cups=el("div","measure-cups");
+      for(let j=0;j<item.value;j++)cups.append(el("span","measure-cup"));
+      row.append(cups);
+    }
+    row.append(el("span","",item.value+unit));panel.append(row);
+  });
+  const values=problem.choices.map(item=>item.value),difference=Math.abs(values[0]-values[1]);
+  panel.append(el("p","comparison-summary",kind==="capacity"?"コップ "+difference+"はいぶん ちがうね。":kind==="length"?difference+"ますぶん ながさが ちがうね。":difference+"ますぶん ひろさが ちがうね。"));
+  return panel;
+}
+function measurementGame(){
+  const st=STAGES[state.index],task=state.measure,problem=task.rounds[task.round],kind=task.kind,body=el("div","");
+  const prompt=kind==="capacity"?"みずの かさが おおいのは どちら？":kind==="length"?"ながいのは どちら？":"ひろいのは どちら？";
+  body.append(el("p","round-progress",(task.round+1)+" / "+task.rounds.length+" もん"));
+  body.append(el("p","quantity-instruction",kind==="capacity"?"はこの かたちの いれものだよ。どちらも おくゆきは おなじ。みずの りょうを くらべよう。":kind==="length"?"はしを そろえると、たしかめられるよ。":"いろの ついた かみの ひろさを くらべよう。"));
+  body.append(button("🔊 もんだいを きく",()=>speak(prompt),"tool"));
+  const options=el("div","intro-options compare-options measurement-options");
+  problem.choices.forEach((item,i)=>{
+    const b=button("",()=>chooseMeasurement(i),"quantity-option"+(state.selected===i?" selected":""),task.solved||state.win);
+    b.setAttribute("aria-label",item.label+"を えらぶ");b.setAttribute("aria-pressed",String(state.selected===i));
+    add(b,el("strong","",item.label),measureShape(kind,item,false),el("span","quantity-pick","えらぶ"));options.append(b);
+  });
+  body.append(options);
+  if(state.selected!==null)body.append(measurementResult(task));
+  if(state.feedback)body.append(feedback());
+  if(task.solved&&!state.win)body.append(button("できたね！ つぎの もんだい →",nextMeasurement,"btn btn-primary quantity-check"));
+  if(state.win)body.append(success(st.name+"、できたね！","そろえて くらべると、たしかめられるね。"));
+  body.append(button("⟳ はじめから ためす",()=>{state.measure=makeMeasurement(kind);state.selected=null;state.feedback="";state.win=false;render();},"tool"));
+  return gameShell(CHAPTERS[st.chapter].name,st.name,prompt,body);
+}
+
 
 function makeIntro(kind){
   if(kind==="compare"){
@@ -570,7 +686,7 @@ function pairGame(){
 }
 function render(){
   const kind=state.screen==="stage"?STAGES[state.index].kind:null;
-  ROOT.replaceChildren(state.screen==="home"?home():kind==="compare"||kind==="classify"?introGame():kind==="count"?counting():kind==="quantity"?quantityGame():pairGame());
+  ROOT.replaceChildren(state.screen==="home"?home():kind==="compare"||kind==="classify"?introGame():["capacity","length","area"].includes(kind)?measurementGame():kind==="count"?counting():kind==="quantity"?quantityGame():pairGame());
 }
 render();
 if("serviceWorker" in navigator && location.protocol==="https:"){

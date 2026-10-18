@@ -175,3 +175,27 @@ button:focus-visible{outline:4px solid #e6a629;outline-offset:3px}
 .set-rule>strong{color:#79602c;font-size:13px}
 .set-rule p{margin:6px 0}
 .round-progress{font-weight:900;color:#117b74}
+.measure-shape{min-height:170px;display:flex;align-items:flex-end;justify-content:center;padding:12px 0;width:100%}
+.measure-vessel{box-sizing:content-box;border:3px solid #5293a6;border-top:0;border-radius:0 0 10px 10px;position:relative;background:#f1fbff;max-width:100%}
+.measure-water{position:absolute;left:0;bottom:0;width:100%;height:calc(100% - 12px);background:#74c8e6;border-radius:0 0 6px 6px}
+.measure-track{width:100%;height:55px;display:flex;align-items:flex-end}
+.measure-track.aligned{border-left:3px solid #54746d;border-bottom:2px solid #54746d}
+.measure-strip{height:24px;background:#319e7c;border-radius:3px;flex:none}
+.measurement-options .quantity-option:nth-child(2) .measure-strip{background:#e99149}
+.measure-strip.pencil{height:17px;border-right:10px solid #ead1a3;border-radius:2px 10px 10px 2px}
+.measure-strip.train{display:flex;gap:2px;background:transparent!important}
+.train-car{flex:1;min-width:0;background:#efc54c;border-bottom:5px solid #516d78;font-size:12px;text-align:center;overflow:hidden}
+.measure-paper{display:grid;background:#80c9a7;border:2px solid #468a70;box-sizing:content-box}
+.measurement-options .quantity-option:nth-child(2) .measure-paper{background:#f1bc74;border-color:#c0873d}
+.paper-square{width:22px;height:22px}
+.gridded .paper-square{border:1px solid #ffffffa8}
+.measure-result-row{padding:12px 0;border-top:1px solid #c7dfd5}
+.measure-result-row>.measure-shape{min-height:0;justify-content:flex-start;padding:10px 0}
+.measure-result-row>.measure-shape .measure-track{height:35px}
+.measure-result-row>.measure-shape,.measure-ruler{max-width:320px}
+.measure-ruler{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));border-left:3px solid #54746d;margin-bottom:8px}
+.measure-ruler span{height:24px;border-right:1px solid #81aaa0;text-align:center;color:#117b74}
+.measure-cups,.measure-tiles{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.measure-cup{box-sizing:content-box;display:block;width:20px;height:27px;border:2px solid #458ea4;border-top:1px solid #458ea4;background:#8dd7ef;border-radius:0 0 5px 5px}
+.area-unit{width:22px;height:22px;background:#80c9a7;border:1px solid #468a70}
+@media(max-width:400px){.measurement-options{gap:7px}.measurement-options .quantity-option{padding:10px 4px}.measure-shape{min-height:162px}}

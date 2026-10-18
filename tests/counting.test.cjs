@@ -48,7 +48,7 @@ test("intro games allow retries, save completion, and lead into original stages"
   const root=new Node();
   const context={document:{getElementById:()=>root,createElement:()=>new Node()},window:{scrollTo(){}},localStorage:{getItem:()=>null,setItem(){}},navigator:{},location:{protocol:"http:"},clearTimeout,setTimeout};
   vm.createContext(context);
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,state,progress,STAGES,unlocked};})();"),context);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,chooseMeasurement,nextMeasurement,measurementResult,state,progress,STAGES,unlocked};})();"),context);
   const game=context.game;
   game.enter(0);
   const intro=game.state.intro;
@@ -62,7 +62,32 @@ test("intro games allow retries, save completion, and lead into original stages"
   assert.equal(grid.children.filter(node=>node.className.includes("paired")).length,4);
   game.chooseIntro(intro.answer);
   assert.equal(game.state.win,true);
-  game.enter(1);
+  for(let stage=1;stage<=3;stage++){
+    game.enter(stage);
+    const task=game.state.measure;
+    assert.equal(task.rounds.length,3);
+    for(let round=0;round<3;round++){
+      const problem=task.rounds[round];
+      assert.ok(problem.choices[problem.answer].value>problem.choices[1-problem.answer].value);
+      game.nextMeasurement();
+      assert.equal(task.round,round,"cannot skip an unsolved measurement");
+      game.chooseMeasurement(1-problem.answer);
+      assert.equal(task.solved,false);
+      assert.equal(game.state.selected,1-problem.answer,"wrong answer still reveals measurement");
+      assert.ok(game.measurementResult(task).children.length>3);
+      game.chooseMeasurement(problem.answer);
+      assert.equal(task.solved,true);
+      assert.equal(game.state.win,round===2);
+      if(round<2){
+        assert.ok(!game.progress.done.includes(game.STAGES[stage].id));
+        game.nextMeasurement();
+        assert.equal(task.round,round+1);
+        assert.equal(game.state.selected,null);
+      }
+    }
+    assert.ok(game.progress.done.includes(game.STAGES[stage].id));
+  }
+  game.enter(4);
   for(let i=0;i<game.state.intro.rounds.length;i++){
     const task=game.state.intro,problem=task.rounds[i];
     game.nextIntroRound();
@@ -81,9 +106,9 @@ test("intro games allow retries, save completion, and lead into original stages"
     }
   }
   function stateSelected(game){return game.state.selected;}
-  assert.deepEqual(Array.from(game.progress.done),["compare-more","find-friends"]);
-  assert.equal(game.unlocked(),2);
-  game.enter(2);
+  assert.deepEqual(Array.from(game.progress.done),["compare-more","compare-capacity","compare-length","compare-area","find-friends"]);
+  assert.equal(game.unlocked(),5);
+  game.enter(5);
   assert.equal(game.STAGES[game.state.index].id,"count-1");
 });
 test("intro generators vary answer positions and keep one clear answer",()=>{
@@ -129,7 +154,7 @@ for(let n=1;n<=10;n++)test(n+" quantity choice: one answer and varied pictures",
   assert.ok(answers.size>3,"answer picture varies");
 });
 const stages=vm.runInNewContext(source.slice(source.indexOf("const COUNT_THINGS"),source.indexOf("const CHAPTERS"))+";STAGES");
-const expectedIds=["compare-more","find-friends"];
+const expectedIds=["compare-more","compare-capacity","compare-length","compare-area","find-friends"];
 for(let n=1;n<=5;n++)expectedIds.push("count-"+n,"quantity-"+n);
 for(let a=1;a<=4;a++)expectedIds.push("make5-"+a);
 expectedIds.push("make5-free");
@@ -138,7 +163,7 @@ for(let a=1;a<=5;a++)expectedIds.push("make10-"+a);
 const plain=value=>JSON.parse(JSON.stringify(value));
 test("5 composition follows quantity 5; each 6–10 is counted, chosen, then built from 5",()=>{
   assert.deepEqual(plain(stages.map(st=>st.id)),expectedIds);
-  assert.equal(new Set(stages.map(st=>st.id)).size,37);
+  assert.equal(new Set(stages.map(st=>st.id)).size,40);
   for(let n=1;n<=10;n++){
     const i=stages.findIndex(st=>st.id==="count-"+n);
     assert.equal(stages[i].kind,"count");
