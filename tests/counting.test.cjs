@@ -92,7 +92,7 @@ test("intro games allow retries, save completion, and lead into original stages"
     const task=game.state.intro,problem=task.rounds[i];
     game.nextIntroRound();
     assert.equal(task.round,i,"cannot skip unsolved questions");
-    game.chooseIntro((problem.answer+1)%9);
+    game.chooseIntro((problem.answer+1)%problem.choices.length);
     assert.equal(task.solved,false);
     assert.equal(game.state.intro,task);
     game.chooseIntro(problem.answer);
@@ -122,7 +122,10 @@ test("intro generators vary answer positions and keep one clear answer",()=>{
     const friends=make("classify");
     assert.equal(friends.rounds.length,10);
     for(const problem of friends.rounds){
-      assert.equal(problem.choices.length,9);
+      assert.equal(problem.choices.length,problem.members.length===1?9:problem.members.length+1);
+      if(problem.members.length>1){
+        assert.equal(new Set(problem.choices.map(choice=>choice.picture[0])).size,problem.choices.length,"every picture appears exactly once; frequency cannot identify the outsider");
+      }
       assert.equal(problem.choices.filter(choice=>choice.odd).length,1);
       assert.equal(problem.choices[problem.answer].picture,problem.odd);
       assert.ok(problem.rule&&problem.why);

@@ -349,7 +349,10 @@ function makeIntro(kind){
       {rule:"おんがくを かなでる がっき",members:[["🎸","ぎたー"],["🎻","ばいおりん"],["🎺","とらんぺっと"],["🥁","たいこ"],["🪈","ふえ"]],odd:["🔨","かなづち"],why:"かなづちも おとは でるけど、ここでは ものを つくる どうぐ。おんがくを かなでる がっきの なかまから はずれるね。"}
     ];
     const rounds=problems.map(problem=>{
-      const members=Array.from({length:8},(_,i)=>({picture:problem.members[i%problem.members.length],odd:false}));
+      // Only the introductory same-animal task uses repeated pictures.
+      // All later tasks give every picture the same frequency (one).
+      const pictures=problem.members.length===1?Array(8).fill(problem.members[0]):problem.members;
+      const members=pictures.map(picture=>({picture,odd:false}));
       const choices=shuffle([...members,{picture:problem.odd,odd:true}]);
       return {...problem,choices,answer:choices.findIndex(item=>item.odd)};
     });
