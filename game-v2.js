@@ -20,7 +20,13 @@ for(let n=6;n<=10;n++){
   STAGES.push({id:"fiveplus-"+n,kind:"pair",target:n,a:5,chapter:2,name:"5と いくつで "+n+"？"});
 }
 for(let a=1;a<=5;a++)STAGES.push({id:"make10-"+a,kind:"pair",target:10,a:a,chapter:3,name:a+"と いくつで 10？"});
+STAGES.forEach(stage=>stage.chapter++);
+STAGES.unshift(
+  {id:"compare-more",kind:"compare",chapter:0,name:"どちらがおおい？"},
+  {id:"find-friends",kind:"classify",chapter:0,name:"なかまはどれ？"}
+);
 const CHAPTERS = [
+  {name:"まずは くらべて なかまわけ",sub:"どちらがおおい？ → なかまはどれ？",icon:"🌷"},
   {name:"① 1〜5を かぞえよう",sub:"えを かぞえる → その かずを さがす",icon:"🔎"},
   {name:"② 5を つくろう",sub:"2つの タイルで 5を つくる",icon:"🌱"},
   {name:"③ 6〜10を かぞえて つくろう",sub:"かぞえる → えらぶ → 5と あといくつ？",icon:"🌈"},
@@ -75,6 +81,7 @@ function enter(i){
   if(i<0||i>=STAGES.length)return;
   stopQuantityCount();
   state.groups=STAGES[i].kind==="quantity"?quantityGroups(STAGES[i]):[];
+  state.intro=makeIntro(STAGES[i].kind);
   state.selected=null;state.quantityShown=0;state.quantityChecked=false;state.quantityCounting=false;
   state.screen="stage";state.index=i;state.objects=STAGES[i].kind==="count"?shuffledObjects(STAGES[i]):[];state.found=[];state.first=null;state.second=null;state.feedback="";state.win=false;state.free=false;
   progress.last=STAGES[i].id;save();render();window.scrollTo(0,0);
@@ -104,7 +111,7 @@ function home(){
   add(acts,button(progress.done.length?"つづきから あそぶ":"はじめから あそぶ",()=>enter(unlocked()),"btn btn-primary"),button("じゆうに ためす",enterFree,"btn btn-secondary"));
   hero.append(acts);wrap.append(hero);
   const road=el("div","learning-road");
-  add(road,el("strong","","この じゅんばんで あそぶよ"),el("p","","① 1〜5を かぞえる → ② 5を つくる → ③ 6〜10を かぞえて 5から ふやす → ④ 10を つくる"));
+  add(road,el("strong","","この じゅんばんで あそぶよ"),el("p","","くらべる・なかまわけ → ① 1〜5を かぞえる → ② 5を つくる → ③ 6〜10を かぞえて 5から ふやす → ④ 10を つくる"));
   wrap.append(road);
   CHAPTERS.forEach((ch,k)=>{
     const group=el("section","chapter");
@@ -205,6 +212,71 @@ function quantityGroups(stage){
   const counts=[stage.n,...nearby];
   return shuffle(counts.map((count,i)=>({id:"q"+i,emoji:choices[i][0],thing:choices[i][1],count})));
 }
+
+function makeIntro(kind){
+  if(kind==="compare"){
+    const counts=shuffle([2,4]),[emoji,thing]=shuffle(COUNT_THINGS)[0];
+    return {groups:counts.map((count,i)=>({id:"intro-"+i,count,emoji,thing})),answer:counts.indexOf(4)};
+  }
+  if(kind==="classify"){
+    const families=[
+      {name:"くだもの",examples:["🍎","🍇"],answer:"🍌",others:["🚗","👟"]},
+      {name:"のりもの",examples:["🚗","🚌"],answer:"🚒",others:["🍎","👟"]},
+      {name:"どうぶつ",examples:["🐶","🐱"],answer:"🐰",others:["🚗","🍌"]}
+    ];
+    const family=shuffle(families)[0],choices=shuffle([family.answer,...family.others]);
+    return {family,choices,answer:choices.indexOf(family.answer)};
+  }
+  return null;
+}
+function chooseIntro(index){
+  if(state.win)return;
+  state.selected=index;
+  if(index===state.intro.answer){state.feedback="";finish();}
+  else state.feedback=STAGES[state.index].kind==="compare"
+    ?"1こずつ ならべて、あまる ほうを さがそう。"
+    :"おてほんの えは どんな なかまかな？ もういちど みてみよう。";
+  render();
+}
+function introGame(){
+  const st=STAGES[state.index],task=state.intro,body=el("div","");
+  const compare=st.kind==="compare";
+  if(!compare){
+    const sample=el("div","count-task");
+    add(sample,el("strong","","おてほん"),el("span","task-emoji",task.family.examples.join(" ")));
+    body.append(sample);
+  }
+  body.append(el("p","quantity-instruction",compare
+    ?"1こずつ くらべて、おおい ほうを タップしよう。"
+    :"おてほんと おなじ なかまの えを タップしよう。"));
+  const options=el("div","intro-options"+(compare?" compare-options":""));
+  const choices=compare?task.groups:task.choices;
+  choices.forEach((item,i)=>{
+    const b=button("",()=>chooseIntro(i),"quantity-option"+(state.selected===i?" selected":""),state.win);
+    b.setAttribute("aria-pressed",String(state.selected===i));
+    if(compare){
+      b.setAttribute("aria-label",(i===0?"ひだり":"みぎ")+"の "+item.thing+"を えらぶ");
+      const pictures=el("span","intro-pictures");pictures.setAttribute("aria-hidden","true");
+      for(let j=0;j<item.count;j++)pictures.append(el("span","quantity-picture",item.emoji));
+      b.append(pictures);
+    }else{
+      b.setAttribute("aria-label",item+"を えらぶ");
+      b.append(el("span","friend-picture",item));
+    }
+    b.append(el("span","quantity-pick",state.selected===i?"✓ これに する":"えらぶ"));
+    options.append(b);
+  });
+  body.append(options);
+  if(state.win)body.append(success(compare
+    ?"こちらが おおいね！ 1こずつ ならべると、2こ あまるよ。"
+    :task.family.examples.join(" ")+" と "+task.family.answer+" は "+task.family.name+"の なかまだね！"));
+  else if(state.feedback)body.append(feedback());
+  body.append(button("⟳ ちがう えで ためす",()=>{state.intro=makeIntro(st.kind);state.selected=null;state.feedback="";state.win=false;render();},"tool"));
+  return gameShell(CHAPTERS[st.chapter].name,st.name,compare
+    ?"どちらがおおい？ えを くらべよう。"
+    :"なかまはどれ？ おてほんと くらべよう。",body);
+}
+
 function resetCounting(){
   state.objects=shuffledObjects(STAGES[state.index]);
   state.found=[];state.win=false;state.feedback="";
@@ -402,7 +474,7 @@ function pairGame(){
   const a=fixed?st.a:state.first,b=state.second;
   const base=el("section","equation-panel");
   let prompt;
-  if(st.chapter===2&&!state.free){
+  if(st.chapter===3&&!state.free){
     prompt="5こ の タイルから、あと いくつで "+st.target+"こ？";
   }else{
     prompt=st.target+"こ に なるように、2つの タイルを ならべよう。";
@@ -418,7 +490,7 @@ function pairGame(){
   const total=fillA+fillB;
   add(label,el("span","","いま "+total+"こ"),el("strong","",total===st.target?"ぴったり！":total<st.target?"あと "+(st.target-total)+"こ":" "+(total-st.target)+"こ はみだす"));
   meter.append(label);base.append(meter);
-  if(st.chapter===2&&!state.free)base.append(el("div","five-explainer","🔵 まず 5こ。そこから "+(st.target-5)+"こ ふえると "+st.target+"こ。"));
+  if(st.chapter===3&&!state.free)base.append(el("div","five-explainer","🔵 まず 5こ。そこから "+(st.target-5)+"こ ふえると "+st.target+"こ。"));
   body.append(base);
   if(state.win){
     body.append(success(a+" と "+b+" で "+st.target+"！","2つの タイルだけで つくれたね。"));
@@ -442,7 +514,7 @@ function pairGame(){
 }
 function render(){
   const kind=state.screen==="stage"?STAGES[state.index].kind:null;
-  ROOT.replaceChildren(state.screen==="home"?home():kind==="count"?counting():kind==="quantity"?quantityGame():pairGame());
+  ROOT.replaceChildren(state.screen==="home"?home():kind==="compare"||kind==="classify"?introGame():kind==="count"?counting():kind==="quantity"?quantityGame():pairGame());
 }
 render();
 if("serviceWorker" in navigator && location.protocol==="https:"){

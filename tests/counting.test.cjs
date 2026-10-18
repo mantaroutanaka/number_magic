@@ -37,6 +37,53 @@ for(let n=1;n<=10;n++)test(n+" objects: frequency cannot uniquely identify the t
   assert.ok(decoyTypes.size>3,"distractor identities vary");
 });
 
+test("intro games allow retries, save completion, and lead into original stages",()=>{
+  class Node{
+    constructor(){this.children=[];this.style={};this.dataset={};this.textContent="";}
+    append(...items){this.children.push(...items);}
+    replaceChildren(...items){this.children=items;}
+    setAttribute(){}
+    addEventListener(){}
+  }
+  const root=new Node();
+  const context={document:{getElementById:()=>root,createElement:()=>new Node()},window:{scrollTo(){}},localStorage:{getItem:()=>null,setItem(){}},navigator:{},location:{protocol:"http:"},clearTimeout,setTimeout};
+  vm.createContext(context);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,state,progress,STAGES,unlocked};})();"),context);
+  const game=context.game;
+  for(let i=0;i<2;i++){
+    game.enter(i);
+    const intro=game.state.intro,answer=intro.answer;
+    game.chooseIntro((answer+1)%(i===0?2:3));
+    assert.equal(game.state.win,false);
+    assert.equal(game.state.intro,intro,"wrong answer preserves task");
+    game.chooseIntro(answer);
+    assert.equal(game.state.win,true);
+    assert.ok(game.progress.done.includes(game.STAGES[i].id));
+    game.chooseIntro(answer);
+    assert.equal(game.progress.done.length,i+1);
+  }
+  assert.equal(game.unlocked(),2);
+  game.enter(2);
+  assert.equal(game.STAGES[game.state.index].id,"count-1");
+});
+test("intro generators vary answer positions and keep one clear answer",()=>{
+  const make=vm.runInNewContext(source.slice(source.indexOf("function makeIntro("),source.indexOf("function chooseIntro("))+";makeIntro",{shuffle:items=>items.slice().sort(()=>Math.random()-.5),COUNT_THINGS:things});
+  const sides=new Set(),positions=new Set();
+  for(let i=0;i<500;i++){
+    const comparison=make("compare");
+    assert.equal(comparison.groups[comparison.answer].count,4);
+    assert.equal(comparison.groups.filter(g=>g.count===4).length,1);
+    sides.add(comparison.answer);
+    const friends=make("classify");
+    assert.equal(friends.choices[friends.answer],friends.family.answer);
+    assert.equal(new Set(friends.choices).size,3);
+    positions.add(friends.answer);
+  }
+  assert.equal(sides.size,2);
+  assert.equal(positions.size,3);
+});
+
+
 for(let n=1;n<=10;n++)test(n+" quantity choice: one answer and varied pictures",()=>{
   const positions=new Set(),answers=new Set(),ranks=new Set();
   for(let attempt=0;attempt<1000;attempt++){
@@ -56,7 +103,7 @@ for(let n=1;n<=10;n++)test(n+" quantity choice: one answer and varied pictures",
   assert.ok(answers.size>3,"answer picture varies");
 });
 const stages=vm.runInNewContext(source.slice(source.indexOf("const COUNT_THINGS"),source.indexOf("const CHAPTERS"))+";STAGES");
-const expectedIds=[];
+const expectedIds=["compare-more","find-friends"];
 for(let n=1;n<=5;n++)expectedIds.push("count-"+n,"quantity-"+n);
 for(let a=1;a<=4;a++)expectedIds.push("make5-"+a);
 expectedIds.push("make5-free");
@@ -65,7 +112,7 @@ for(let a=1;a<=5;a++)expectedIds.push("make10-"+a);
 const plain=value=>JSON.parse(JSON.stringify(value));
 test("5 composition follows quantity 5; each 6–10 is counted, chosen, then built from 5",()=>{
   assert.deepEqual(plain(stages.map(st=>st.id)),expectedIds);
-  assert.equal(new Set(stages.map(st=>st.id)).size,35);
+  assert.equal(new Set(stages.map(st=>st.id)).size,37);
   for(let n=1;n<=10;n++){
     const i=stages.findIndex(st=>st.id==="count-"+n);
     assert.equal(stages[i].kind,"count");
@@ -103,9 +150,9 @@ test("older 25-stage completions retain identity without completing new choices"
   assert.deepEqual(plain(migrate(next)),next);
 });
 test("invalid saved progress is discarded without creating completions",()=>{
-  assert.deepEqual(plain(migrate(null)),{version:4,done:[],last:"count-1"});
-  assert.deepEqual(plain(migrate({done:[-1,25,"1",1,1],last:99})),{version:4,done:["count-2"],last:"count-1"});
-  assert.deepEqual(plain(migrate({version:4,done:[0,"count-1","missing","count-1"],last:"missing"})),{version:4,done:["count-1"],last:"count-1"});
+  assert.deepEqual(plain(migrate(null)),{version:4,done:[],last:"compare-more"});
+  assert.deepEqual(plain(migrate({done:[-1,25,"1",1,1],last:99})),{version:4,done:["count-2"],last:"compare-more"});
+  assert.deepEqual(plain(migrate({version:4,done:[0,"count-1","missing","count-1"],last:"missing"})),{version:4,done:["count-1"],last:"compare-more"});
 });
 
 test("quantity choices do not repeat the previous animal or mix two fish types",()=>{
@@ -116,3 +163,4 @@ test("quantity choices do not repeat the previous animal or mix two fish types",
     assert.equal(new Set(groups.map(g=>kind(g.emoji))).size,3);
   }
 });
+
