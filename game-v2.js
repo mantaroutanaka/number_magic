@@ -289,12 +289,24 @@ function makeTwenty(mode){
       return {a,b,op,result,missing,answer,equation,choices,prompt:mode==="parts"?"□に はいる かずを えらぼう。":"タイルで たしかめて、こたえを えらぼう。"};
     });
   }
-  return {mode,rounds,round:0,solved:false,tapped:[],digits:[null,null]};
+  return {mode,rounds,round:0,solved:false,tapped:[],digits:[null,null],groupSize:1};
 }
 function tapTwenty(index){
   const task=state.twenty,problem=task.rounds[task.round];
   if(task.mode!=="count"||task.solved||!Number.isInteger(index)||index<0||index>=problem.n||task.tapped.includes(index))return;
   task.tapped.push(index);state.feedback="";speak(READ[task.tapped.length]);render();
+}
+function setTwentyGroupSize(size){
+  const task=state.twenty;
+  if(task.mode!=="count"||task.solved||![1,2,5].includes(size))return;
+  task.groupSize=size;state.feedback="";render();
+}
+function tapTwentyGroup(start){
+  const task=state.twenty,problem=task.rounds[task.round],size=task.groupSize;
+  if(task.mode!=="count"||task.solved||!Number.isInteger(start)||start<0||start>=problem.n||start%size!==0)return;
+  const remaining=Array.from({length:Math.min(size,problem.n-start)},(_,i)=>start+i).filter(index=>!task.tapped.includes(index));
+  if(!remaining.length)return;
+  task.tapped.push(...remaining);state.feedback="";speak(READ[task.tapped.length]);render();
 }
 function setTwentyDigit(place,digit){
   const task=state.twenty;
@@ -351,14 +363,26 @@ function twentyGame(){
   const st=STAGES[state.index],task=state.twenty,problem=task.rounds[task.round],mode=task.mode,body=el("div","");
   add(body,el("p","round-progress",(task.round+1)+" / "+task.rounds.length+" もん"),button("🔊 もんだいを きく",()=>speak((mode==="calculate"?calculationStory(problem)+" ":"")+problem.prompt+(problem.equation?" "+problem.equation.replace("□","しかく"):"")),"tool"));
   if(mode==="count"){
-    const scene=el("div","twenty-scene");
-    for(let i=0;i<problem.n;i++){
-      const done=task.tapped.includes(i);
-      const b=button("🍎"+(done?" ✓":""),()=>tapTwenty(i),"twenty-object"+(done?" counted":""),done);
-      b.setAttribute("aria-label","りんご "+(i+1)+(done?" かぞえた":"を かぞえる"));scene.append(b);
+    const grouping=el("div","group-count-switch");
+    [1,2,5].forEach(size=>{
+      const b=button(size+"こずつ",()=>setTwentyGroupSize(size),"tool"+(task.groupSize===size?" active":""),task.solved);
+      b.setAttribute("aria-pressed",String(task.groupSize===size));grouping.append(b);
+    });
+    body.append(grouping);
+    const scene=el("div","twenty-scene"+(task.groupSize>1?" grouped":""));
+    for(let i=0;i<problem.n;i+=task.groupSize){
+      const indices=Array.from({length:Math.min(task.groupSize,problem.n-i)},(_,j)=>i+j);
+      const remaining=indices.filter(index=>!task.tapped.includes(index)).length,done=remaining===0;
+      const b=button("",()=>tapTwentyGroup(i),"twenty-object"+(task.groupSize>1?" twenty-group":"")+(done?" counted":""),done);
+      const pictures=el("span","group-count-pictures");
+      indices.forEach(index=>pictures.append(el("span",task.tapped.includes(index)?"already-counted":"","🍎")));
+      b.append(pictures);
+      if(task.groupSize>1)b.append(el("span","group-count-label",indices.length+"この まとまり"+(done?" ✓":"")));
+      b.setAttribute("aria-label",done?"かぞえた まとまり":remaining+"この りんごを まとめて かぞえる");
+      scene.append(b);
     }
     body.append(scene);body.append(baseTen(task.tapped.length));
-    body.append(el("p","quantity-instruction",task.tapped.length===problem.n?"ぜんぶ かぞえたね。すうじを えらぼう。":"りんごを 1こずつ タップしよう。10こ たまると まとまるよ。"));
+    body.append(el("p","quantity-instruction",task.tapped.length===problem.n?"ぜんぶ かぞえたね。1こずつでも まとめても、ぜんぶの かずは おなじだよ。":task.groupSize===1?"りんごを 1こずつ タップしよう。10こ たまると まとまるよ。":task.groupSize+"こずつの まとまりを タップしよう。さいごの あまりも わすれずに。"));
   }else if(mode==="read"){
     body.append(el("div","twenty-reading","「"+READ[problem.n]+"」"));
     body.append(button("🔊 かずを きく",()=>speak(READ[problem.n]),"tool"));

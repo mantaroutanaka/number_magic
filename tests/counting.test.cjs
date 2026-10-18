@@ -48,7 +48,7 @@ test("intro games allow retries, save completion, and lead into original stages"
   const root=new Node();
   const context={document:{getElementById:()=>root,createElement:()=>new Node()},window:{scrollTo(){}},localStorage:{getItem:()=>null,setItem(){}},navigator:{},location:{protocol:"http:"},clearTimeout,setTimeout};
   vm.createContext(context);
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,chooseMeasurement,nextMeasurement,measurementResult,chooseOrdinal,nextOrdinal,tapTwenty,setTwentyDigit,chooseTwenty,nextTwenty,state,progress,STAGES,unlocked};})();"),context);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/, "globalThis.game={enter,chooseIntro,nextIntroRound,comparisonResult,chooseMeasurement,nextMeasurement,measurementResult,chooseOrdinal,nextOrdinal,tapTwenty,setTwentyDigit,chooseTwenty,nextTwenty,setTwentyGroupSize,tapTwentyGroup,state,progress,STAGES,unlocked};})();"),context);
   const game=context.game;
   game.enter(0);
   const intro=game.state.intro;
@@ -110,6 +110,29 @@ test("intro games allow retries, save completion, and lead into original stages"
   assert.equal(game.unlocked(),5);
   game.enter(5);
   assert.equal(game.STAGES[game.state.index].id,"count-1");
+  for(const size of [2,5])for(let round=0;round<10;round++){
+    game.enter(game.STAGES.findIndex(stage=>stage.id==="twenty-count"));
+    const task=game.state.twenty;
+    task.round=round;
+    const problem=task.rounds[round];
+    game.setTwentyGroupSize(size);
+    for(let start=0;start<problem.n;start+=size){
+      game.tapTwentyGroup(start);
+      const counted=task.tapped.length;
+      game.tapTwentyGroup(start);
+      assert.equal(task.tapped.length,counted,"group double taps cannot duplicate objects");
+    }
+    assert.equal(task.tapped.length,problem.n,"includes incomplete final groups");
+    assert.equal(new Set(task.tapped).size,problem.n);
+    game.chooseTwenty(problem.answer);
+    assert.equal(task.solved,true);
+  }
+  game.enter(game.STAGES.findIndex(stage=>stage.id==="twenty-count"));
+  game.tapTwenty(0);
+  game.setTwentyGroupSize(5);
+  game.tapTwentyGroup(0);
+  assert.equal(game.state.twenty.tapped.length,5,"switching methods preserves already counted items");
+  game.progress.done=game.progress.done.filter(id=>id!=="twenty-count");
   for(const mode of ["count","read","place","compare","sequence","parts","calculate"]){
     const id="twenty-"+mode,index=game.STAGES.findIndex(stage=>stage.id===id);
     assert.ok(index>game.STAGES.findIndex(stage=>stage.id==="ordinal-grid"));
