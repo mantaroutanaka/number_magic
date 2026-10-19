@@ -248,6 +248,21 @@ for(let n=1;n<=10;n++)test(n+" quantity choice: one answer and varied pictures",
   if(n>=3&&n<=8)assert.equal(ranks.size,3,"answer is not always the middle-sized group");
   assert.ok(answers.size>3,"answer picture varies");
 });
+for(let n=1;n<=10;n++)test(n+" quantity choice: feasible ranks stay balanced across replays",()=>{
+  const generators=vm.runInNewContext(source.slice(begin,end)+";({quantityGroups})",{Math:math,COUNT_THINGS:things});
+  const frequencies=[0,0,0];
+  // 1 and 10 can only be smallest/largest; 2 and 9 cannot occupy every rank.
+  const feasible=n===1?[0]:n===10?[2]:n===2?[0,1]:n===9?[1,2]:[0,1,2];
+  for(let attempt=0;attempt<600;attempt++){
+    // Other stages must not consume this number's balancing sequence.
+    generators.quantityGroups({n:n===10?1:10,avoidEmoji:"🐢"});
+    const groups=generators.quantityGroups({n,avoidEmoji:"🐢"});
+    assert.ok(groups.every(group=>Math.abs(group.count-n)<=2),"nearby quantities remain countable");
+    frequencies[groups.filter(group=>group.count<n).length]++;
+  }
+  for(const rank of [0,1,2])assert.equal(frequencies[rank],feasible.includes(rank)?600/feasible.length:0,
+    "no feasible size rank is favored");
+});
 const stages=vm.runInNewContext(source.slice(source.indexOf("const COUNT_THINGS"),source.indexOf("const CHAPTERS"))+";STAGES");
 const expectedIds=["compare-more","compare-capacity","compare-length","compare-area","find-friends"];
 for(let n=1;n<=5;n++)expectedIds.push("count-"+n,"quantity-"+n);
