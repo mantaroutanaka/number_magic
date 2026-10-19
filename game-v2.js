@@ -228,9 +228,23 @@ function shuffledObjects(stage){
   });
   return shuffle(arr);
 }
+const quantityRankBags=new Map();
 function quantityGroups(stage){
   const choices=shuffle(COUNT_THINGS.filter(([emoji])=>emoji!==stage.avoidEmoji&&emoji!=="🐠"&&!(stage.avoidEmoji==="🐠"&&emoji==="🐟"))).slice(0,3);
-  const nearby=shuffle(Array.from({length:10},(_,i)=>i+1).filter(n=>n!==stage.n&&Math.abs(n-stage.n)<=2)).slice(0,2);
+  const candidates=Array.from({length:10},(_,i)=>i+1).filter(n=>n!==stage.n&&Math.abs(n-stage.n)<=2);
+  const pairsByRank=[[],[],[]];
+  for(let i=0;i<candidates.length;i++)for(let j=i+1;j<candidates.length;j++){
+    const pair=[candidates[i],candidates[j]];
+    pairsByRank[pair.filter(n=>n<stage.n).length].push(pair);
+  }
+  // Balance feasible quantity ranks across replays, in shuffled order.
+  // Keep screen position independently random; 1/10 and 2/9 have fewer feasible ranks.
+  let ranks=quantityRankBags.get(stage.n);
+  if(!ranks||!ranks.length){
+    ranks=shuffle([0,1,2].filter(rank=>pairsByRank[rank].length));
+    quantityRankBags.set(stage.n,ranks);
+  }
+  const nearby=shuffle(pairsByRank[ranks.pop()])[0];
   const counts=[stage.n,...nearby];
   return shuffle(counts.map((count,i)=>({id:"q"+i,emoji:choices[i][0],thing:choices[i][1],count})));
 }
